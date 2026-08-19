@@ -1,0 +1,139 @@
+{
+  "_comment": [
+    "BRAELINN POKER LEAGUE — Firebase Realtime Database rules.",
+    "Paste this into Firebase Console -> Realtime Database -> Rules -> Publish.",
+    "Read SECURITY.md first. Short version: these rules protect your tournament",
+    "HISTORY, which is the only irreplaceable data. They cannot distinguish the",
+    "host from a player, because that requires server-side verification that a",
+    "static site with no accounts cannot do."
+  ],
+
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "leagues": {
+      "braelinn": {
+
+        ".read": true,
+
+        "config": {
+          ".write": true,
+          "pin": {
+            ".validate": "newData.isString() && newData.val().length >= 4 && newData.val().length <= 12"
+          },
+          "$other": { ".validate": false }
+        },
+
+        "photos": {
+          "_comment": [
+            "Player-uploaded avatars, stored as small JPEG data URLs.",
+            "The 40000-char cap is what stops someone pasting a 4MB image",
+            "into the database and blowing through the free tier."
+          ],
+          ".write": true,
+          "$player": {
+            ".validate": "newData.isString() && newData.val().length <= 40000 && newData.val().beginsWith('data:image/')"
+          }
+        },
+
+        "rsvp": {
+          "$gameId": {
+            ".write": true,
+            "$player": {
+              ".validate": "newData.isString() && newData.val().matches(/^(in|maybe|out)$/)"
+            }
+          }
+        },
+
+        "live": {
+          "$gameId": {
+            ".write": true,
+
+            "status": {
+              ".validate": "newData.isString() && newData.val().matches(/^(checkin|running|final)$/)"
+            },
+
+            "players": {
+              "$player": {
+                ".validate": "newData.hasChildren(['status'])",
+                "status":  { ".validate": "newData.val().matches(/^(active|out)$/)" },
+                "bustAt":  { ".validate": "newData.isNumber() || !newData.exists()" },
+                "buyins":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10" },
+                "rebuys":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 20" },
+                "late":    { ".validate": "newData.isBoolean()" },
+                "bonus":   { ".validate": "newData.isBoolean()" },
+                "joinedAt":{ ".validate": "newData.isNumber()" },
+                "$other":  { ".validate": false }
+              }
+            },
+
+            "reports": {
+              "$id": {
+                ".validate": "newData.hasChildren(['name','type','at'])",
+                "name": { ".validate": "newData.isString() && newData.val().length <= 40" },
+                "type": { ".validate": "newData.val().matches(/^(out|win)$/)" },
+                "at":   { ".validate": "newData.isNumber()" },
+                "$other": { ".validate": false }
+              }
+            },
+
+            "seats": {
+              "tables": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 6" },
+              "order":  { ".validate": "newData.hasChildren()" },
+              "drawnAt":{ ".validate": "newData.isNumber()" },
+              "$other": { ".validate": false }
+            },
+
+            "timer": {
+              "running":       { ".validate": "newData.isBoolean()" },
+              "paused":        { ".validate": "newData.isBoolean()" },
+              "startedAt":     { ".validate": "newData.isNumber()" },
+              "elapsedBefore": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "$other":        { ".validate": false }
+            }
+          }
+        },
+
+        "results": {
+          "$gameId": {
+            "_comment": [
+              "APPEND-ONLY. This is the rule that actually matters.",
+              "A finalized game may be created once. It can never be edited or",
+              "deleted from the app, by accident or otherwise. Season standings",
+              "derive from these records, so protecting them protects the season.",
+              "To correct a genuinely wrong result, edit it in the Firebase",
+              "Console by hand -- deliberately awkward, which is the point."
+            ],
+            ".write": "!data.exists() && newData.exists()",
+            ".validate": "newData.hasChildren(['gameId','date','field','finish','winner','finalizedAt'])",
+
+            "gameId":      { ".validate": "newData.isString()" },
+            "date":        { ".validate": "newData.isString()" },
+            "season":      { ".validate": "newData.isNumber()" },
+            "label":       { ".validate": "newData.isString()" },
+            "field":       { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 100" },
+            "winner":      { ".validate": "newData.isString()" },
+            "finalizedAt": { ".validate": "newData.isNumber()" },
+
+            "finish": {
+              "$row": {
+                ".validate": "newData.hasChildren(['place','name','points'])",
+                "place":    { ".validate": "newData.isNumber() && newData.val() >= 1" },
+                "name":     { ".validate": "newData.isString()" },
+                "points":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "winnings": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "rebuys":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
+                "itm":      { ".validate": "newData.isBoolean()" },
+                "late":     { ".validate": "newData.isBoolean()" },
+                "$other":   { ".validate": false }
+              }
+            },
+
+            "$other": { ".validate": true }
+          }
+        }
+      }
+    }
+  }
+}

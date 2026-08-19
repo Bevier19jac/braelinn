@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#06120d">
+<title>The Chase — Braelinn Poker League</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="nav"></div>
+
+<div class="wrap">
+  <header class="hero" style="padding-bottom:20px">
+    <p class="hero-eyebrow" id="eyebrow">Season 7</p>
+    <h1>The Chase</h1>
+    <p class="hero-sub" id="sub"></p>
+  </header>
+
+  <section>
+    <div class="stat-row">
+      <div class="stat"><span class="n" id="sGames">0</span><span class="l">Games Played</span></div>
+      <div class="stat"><span class="n" id="sPlayers">0</span><span class="l">Have Played</span></div>
+      <div class="stat"><span class="n" id="sLeader">—</span><span class="l">Out Front</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Season <span id="seasonNo"></span></h2>
+      <span class="hint"><button class="btn btn-sm" id="btnToggle">Show everyone</button></span>
+    </div>
+    <div class="card" style="padding:6px 10px">
+      <div class="tbl-scroll">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>#</th><th>Player</th>
+              <th data-sort="points">Pts</th>
+              <th data-sort="events">G</th>
+              <th data-sort="wins">W</th>
+              <th data-sort="cashes">ITM</th>
+              <th data-sort="avgPlace">Avg</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <p class="tiny muted mt" id="pointsNote"></p>
+  </section>
+
+  <section id="gamesSec" hidden>
+    <div class="sec-head"><h2>Every Game</h2><span class="hint" id="gamesHint"></span></div>
+    <div id="gamesList"></div>
+  </section>
+
+  <section id="emptySec">
+    <div class="card">
+      <p class="empty" style="padding:24px 12px">
+        No games recorded yet.<br><br>
+        <span class="tiny muted">Standings build themselves. When a tournament is finalized on
+        the Game Night page, the result lands here automatically — nobody edits a file.</span>
+      </p>
+    </div>
+  </section>
+</div>
+
+<div id="footer"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="data.js"></script>
+<script src="app-core.js"></script>
+<script src="fx.js"></script>
+<script>
+(function () {
+  "use strict";
+  UI.mount("standings.html");
+
+  document.getElementById("eyebrow").textContent = "Season " + LEAGUE.season + " · " + LEAGUE.host;
+  document.getElementById("seasonNo").textContent = LEAGUE.season;
+  document.getElementById("pointsNote").textContent =
+    LEAGUE.points.describe + " G = games played, ITM = in the money, Avg = average finish. " +
+    "Every number here comes from finalized games.";
+
+  let sortKey = "points", showAll = false, agg = null;
+
+  function render() {
+    if (!agg) return;
+
+    document.getElementById("sGames").textContent = agg.gamesPlayed;
+    document.getElementById("sPlayers").textContent = agg.players.filter(p => p.events).length;
+
+    const hasGames = agg.gamesPlayed > 0;
+    document.getElementById("emptySec").hidden = hasGames;
+    document.getElementById("gamesSec").hidden = !hasGames;
+
+    document.getElementById("sub").textContent = hasGames
+      ? agg.gamesPlayed + (agg.gamesPlayed === 1 ? " game" : " games") + " in the books."
+      : "Season " + LEAGUE.season + " hasn't started. Everyone's level at zero.";
+
+    let rows = agg.players.slice();
+    if (!showAll) rows = rows.filter(p => p.reg || p.events > 0);
+
+    rows.sort((a, b) => {
+      if (sortKey === "avgPlace") return (a.avgPlace || 999) - (b.avgPlace || 999);
+      return (b[sortKey] - a[sortKey]) || (b.points - a.points) || a.name.localeCompare(b.name);
+    });
+
+    document.getElementById("sLeader").textContent =
+      hasGames && rows.length ? rows[0].name : "—";
+
+    document.getElementById("tbody").innerHTML = rows.map((p, i) =>
+      '<tr><td class="num">' + (i + 1) + '</td>' +
+      '<td><div class="pname">' + UI.avatar(p, "sm") +
+        '<span><b>' + UI.esc(p.name) + '</b>' + (p.host ? ' <span class="tag final">Host</span>' : "") +
+        '<small>' + UI.esc(p.fullName || "") + '</small></span></div></td>' +
+      '<td class="num"><b>' + BPL.chips(p.points) + '</b></td>' +
+      '<td class="num">' + p.events + '</td>' +
+      '<td class="num">' + p.wins + '</td>' +
+      '<td class="num">' + p.cashes + '</td>' +
+      '<td class="num">' + (p.avgPlace ? p.avgPlace.toFixed(1) : "—") + '</td></tr>').join("");
+
+    document.getElementById("btnToggle").textContent =
+      showAll ? "Regulars only" : "Show everyone (" + agg.players.length + ")";
+
+    /* -------- Game history, newest first -------- */
+    const games = agg.games.slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    document.getElementById("gamesHint").textContent = games.length + " recorded";
+    document.getElementById("gamesList").innerHTML = games.map(g => {
+      const top = (g.finish || []).slice(0, 3);
+      return '<details class="gamecard"><summary>' +
+        '<span class="gdate">' + BPL.fmtShort(g.date) + '</span>' +
+        '<span class="gbody"><strong>' + UI.esc(g.winner || "—") + ' takes it</strong>' +
+        '<small>' + g.field + ' players · ' + BPL.money(g.pot) + ' pot' +
+        (g.rebuys ? ' · ' + g.rebuys + ' rebuys' : '') + '</small></span>' +
+        '<span class="tag done">' + UI.esc(g.label || "Game") + '</span></summary>' +
+        '<div class="tbl-scroll"><table class="tbl">' +
+        '<thead><tr><th>#</th><th>Player</th><th>Pts</th><th>$</th></tr></thead><tbody>' +
+        (g.finish || []).map(r =>
+          '<tr><td class="num">' + r.place + '</td><td>' + UI.esc(r.name) +
+          (r.rebuys ? ' <span class="tiny muted">+' + r.rebuys + 'r</span>' : '') + '</td>' +
+          '<td class="num">' + BPL.chips(r.points) + '</td>' +
+          '<td class="num">' + (r.winnings ? BPL.money(r.winnings) : "—") + '</td></tr>').join("") +
+        '</tbody></table></div></details>';
+    }).join("");
+  }
+
+  document.querySelectorAll("th[data-sort]").forEach(th => {
+    th.style.cursor = "pointer";
+    th.title = "Sort by this column";
+    th.addEventListener("click", () => { sortKey = th.dataset.sort; render(); });
+  });
+
+  document.getElementById("btnToggle").addEventListener("click", () => { showAll = !showAll; render(); });
+
+  DB.on("results", v => { agg = BPL.aggregate(v || {}); render(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#06120d">
+<title>Braelinn Poker League</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="nav"></div>
+
+<div class="wrap">
+
+  <!-- ============================================================ HERO -->
+  <header class="hero">
+    <p class="hero-eyebrow" id="heroEyebrow">Season 7</p>
+    <h1>Braelinn<br>Poker League</h1>
+    <p class="hero-sub" id="heroSub"></p>
+
+    <div class="hero-next">
+      <div><div class="k">Next Game</div><div class="v" id="hnDate">—</div></div>
+      <div><div class="k">Cards Roll</div><div class="v" id="hnTime">—</div></div>
+      <div><div class="k">Buy-in</div><div class="v" id="hnBuyin">—</div></div>
+    </div>
+
+    <p class="hero-note" id="hnNotes"></p>
+    <div class="countdown" id="countdown" hidden></div>
+  </header>
+
+  <!-- ================================================ LIVE GAME BANNER -->
+  <a class="livecard" id="liveCard" href="game.html" hidden></a>
+
+  <!-- ==================================================== ANNOUNCEMENT -->
+  <div id="announce"></div>
+
+  <!-- ========================================================= NUMBERS -->
+  <section>
+    <div class="stat-row">
+      <div class="stat"><span class="n" id="stEvents">0</span><span class="l">Games Played</span></div>
+      <div class="stat"><span class="n" id="stIn">0</span><span class="l">In For Next</span></div>
+      <div class="stat"><span class="n" id="stKitty">$0</span><span class="l">Projected Pot</span></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ RSVP -->
+  <section id="rsvp">
+    <div class="sec-head">
+      <h2>Who's In?</h2>
+      <span class="hint" id="rsvpFor"></span>
+    </div>
+    <div class="card">
+      <input class="inp mb" id="rsvpFilter" type="search" placeholder="Find your name…" aria-label="Find your name">
+      <div class="rsvp-list" id="rsvpList"></div>
+      <button class="btn btn-sm btn-block mt" id="btnRsvpAll"></button>
+      <div class="rsvp-tally">
+        <span><span class="dot in"></span>In <b id="tIn">0</b></span>
+        <span><span class="dot maybe"></span>Maybe <b id="tMaybe">0</b></span>
+        <span><span class="dot out"></span>Out <b id="tOut">0</b></span>
+      </div>
+      <p class="tiny muted mt" style="margin-bottom:0">
+        RSVP isn't the same as playing — <span id="hostName"></span> checks people in at the door,
+        and the seat draw runs off who actually turned up.
+      </p>
+    </div>
+  </section>
+
+  <!-- ======================================================= SEAT DRAW -->
+  <section id="seats">
+    <div class="sec-head">
+      <h2>Seat Draw</h2>
+      <span class="hint" id="seatHint">Game night</span>
+    </div>
+    <div id="seatOut"></div>
+  </section>
+
+  <!-- ======================================================= STANDINGS -->
+  <section>
+    <div class="sec-head">
+      <h2>The Chase</h2>
+      <a class="hint" href="standings.html">Full table →</a>
+    </div>
+    <div class="stand-list" id="standPreview"></div>
+  </section>
+
+  <!-- ======================================================== SCHEDULE -->
+  <section>
+    <div class="sec-head">
+      <h2>What's Coming</h2>
+      <a class="hint" href="schedule.html">Calendar →</a>
+    </div>
+    <div class="sched" id="schedPreview"></div>
+  </section>
+
+  <!-- ========================================================== ROSTER -->
+  <section>
+    <div class="sec-head">
+      <h2>The Roster</h2>
+      <span class="hint" id="rosterCount"></span>
+    </div>
+    <div class="roster" id="roster"></div>
+  </section>
+
+</div>
+
+<div id="footer"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="data.js"></script>
+<script src="app-core.js"></script>
+<script src="fx.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const NG      = LEAGUE.nextGame;
+  const GAME_ID = NG.date;
+  const RSVP    = "rsvp/" + GAME_ID;
+  const LIVE    = "live/" + GAME_ID;
+
+  let rsvpState = {}, livePlayers = {}, liveSeats = null, liveStatus = "", results = {};
+
+  UI.mount("index.html");
+
+  /* ---------------------------------------------------------------- HERO */
+  document.getElementById("heroEyebrow").textContent =
+    "Season " + LEAGUE.season + " · Hosted by " + LEAGUE.host;
+  document.getElementById("heroSub").textContent =
+    LEAGUE.location + " · " + LEAGUE.tagline + " · " + LEAGUE.standings.length + " on the roster";
+  document.getElementById("hnDate").textContent  = BPL.fmtShort(NG.date);
+  document.getElementById("hnTime").textContent  = NG.time;
+  document.getElementById("hnBuyin").textContent = BPL.money(NG.buyin);
+  document.getElementById("hnNotes").textContent = NG.notes || "";
+  document.getElementById("hostName").textContent = LEAGUE.host;
+
+  (function countdown() {
+    const el = document.getElementById("countdown");
+    const [y, m, d] = NG.date.split("-").map(Number);
+    const t = (NG.time || "8:30 PM").match(/(\d+):(\d+)\s*(AM|PM)/i);
+    let hh = t ? Number(t[1]) % 12 : 20;
+    if (t && /pm/i.test(t[3])) hh += 12;
+    const target = new Date(y, m - 1, d, hh, t ? Number(t[2]) : 0, 0);
+
+    function tick() {
+      const ms = target - new Date();
+      if (ms <= 0) { el.textContent = "🃏 Game night is here"; el.hidden = false; return; }
+      const days = Math.floor(ms / 86400000);
+      const hrs  = Math.floor(ms % 86400000 / 3600000);
+      const mins = Math.floor(ms % 3600000 / 60000);
+      el.textContent = days > 0
+        ? "⏳ " + days + "d " + hrs + "h until cards roll"
+        : "⏳ " + hrs + "h " + mins + "m until cards roll";
+      el.hidden = false;
+    }
+    tick(); setInterval(tick, 60000);
+  })();
+
+  /* -------------------------------------------------------- ANNOUNCEMENT */
+  (function () {
+    const a = BPL.activeAnnouncement();
+    if (!a) return;
+    document.getElementById("announce").innerHTML =
+      '<div class="announce"><span class="ic">' + UI.esc(a.icon || "📣") + '</span>' +
+      '<p><span class="lab">' + UI.esc(a.type === "special" ? "League News" : a.type) + '</span>' +
+      UI.esc(a.text) + '</p></div>';
+  })();
+
+  /* ------------------------------------------------------------ SCHEDULE */
+  (function () {
+    const box = document.getElementById("schedPreview");
+    const up = BPL.upcoming().slice(0, 4);
+    if (!up.length) { box.innerHTML = '<p class="empty">Season complete.</p>'; return; }
+    box.innerHTML = up.map((e, i) => schedRow(e, i === 0)).join("") +
+      (up.length < 3
+        ? '<div class="sched-row" style="opacity:.6"><div class="sched-date">TBD<span>?</span></div>' +
+          '<div class="sched-body"><strong>More dates coming</strong>' +
+          '<small>Rest of Season ' + LEAGUE.season + ' goes up here once it\'s set</small></div></div>'
+        : "");
+  })();
+
+  function schedRow(e, isNext) {
+    const [y, m, d] = e.date.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    return '<div class="sched-row ' + (isNext ? "next" : "") + '">' +
+      '<div class="sched-date">' + dt.toLocaleDateString("en-US", { month: "short" }).toUpperCase() +
+        '<span>' + d + '</span></div>' +
+      '<div class="sched-body"><strong>' + UI.esc(e.label) + '</strong>' +
+        '<small>' + dt.toLocaleDateString("en-US", { weekday: "long" }) +
+        (e.note ? " · " + UI.esc(e.note) : "") + '</small></div>' +
+      '<span class="tag ' + e.type + '">' + (isNext ? "Next Up" : e.type) + '</span></div>';
+  }
+
+  /* -------------------------------------------------------------- ROSTER */
+  function renderRoster() {
+    const list = LEAGUE.standings;
+    document.getElementById("rosterCount").textContent = list.length + " players";
+    document.getElementById("roster").innerHTML = list.map(p =>
+      '<div class="pcard">' +
+      '<button class="avabtn" data-photo="' + UI.esc(p.name) + '" ' +
+        'title="' + (Photos.has(p.name) ? "Change" : "Add") + ' photo">' +
+        UI.avatar(p, "lg") +
+        '<span class="avacam">' + (Photos.has(p.name) ? "✎" : "+") + '</span></button>' +
+      '<div><div class="nm">' + UI.esc(p.fullName || p.name) +
+        (p.host ? ' <span class="tag final">Host</span>' : "") + '</div>' +
+        '<div class="fn">"' + UI.esc(p.name) + '"</div>' +
+        '<div class="st" data-stat="' + UI.esc(p.name) + '"></div>' +
+      '</div></div>').join("");
+    renderStandings();
+  }
+
+  /* Anyone can set their own picture — tap your face, pick a photo, done.
+     It's resized in the browser before upload, so nobody has to crop anything
+     and nobody has to collect 34 headshots. */
+  document.getElementById("roster").addEventListener("click", e => {
+    const b = e.target.closest("button[data-photo]");
+    if (!b) return;
+    const name = b.dataset.photo;
+    const has = Photos.has(name);
+
+    if (!has) { Photos.upload(name); return; }
+
+    UI.pick("Photo for " + name, [
+      { value: "change", label: "Choose a different photo" },
+      { value: "remove", label: "Remove photo", sub: "Back to initials" }
+    ]).then(v => {
+      if (v === "change") Photos.upload(name);
+      if (v === "remove") Photos.remove(name);
+    });
+  });
+
+  Photos.onChange(renderRoster);
+  renderRoster();
+
+  /* ----------------------------------------------------------- STANDINGS */
+  function renderStandings() {
+    const agg = BPL.aggregate(results);
+    const box = document.getElementById("standPreview");
+
+    document.getElementById("stEvents").textContent = agg.gamesPlayed;
+
+    /* Roster card stat lines */
+    const byName = {};
+    agg.players.forEach(p => { byName[p.name] = p; });
+    document.querySelectorAll("[data-stat]").forEach(el => {
+      const p = byName[el.dataset.stat];
+      el.textContent = p && p.events
+        ? p.events + " games · " + BPL.chips(p.points) + " pts · " + p.wins + " W"
+        : "No games yet";
+    });
+
+    if (!agg.gamesPlayed) {
+      box.innerHTML = '<p class="empty">Season ' + LEAGUE.season +
+        " hasn't started — everyone's on zero. Points go up the moment a game is finalized.</p>";
+      return;
+    }
+
+    const top = agg.players.filter(p => p.events)
+      .sort((a, b) => b.points - a.points || b.wins - a.wins || a.name.localeCompare(b.name))
+      .slice(0, 5);
+
+    box.innerHTML = top.map((p, i) =>
+      '<div class="stand-row"><span class="rk">' + (i + 1) + '</span>' + UI.avatar(p) +
+      '<span class="nm">' + UI.esc(p.name) + '<small>' + p.events + ' games · ' + p.wins + ' wins</small></span>' +
+      '<span class="pts">' + BPL.chips(p.points) + '</span></div>').join("");
+  }
+
+  /* ---------------------------------------------------------------- RSVP */
+  document.getElementById("rsvpFor").textContent = BPL.fmtDate(NG.date, { month: "short", day: "numeric" });
+
+  let showAllRsvp = false;
+
+  function renderRsvp() {
+    const q = (document.getElementById("rsvpFilter").value || "").toLowerCase();
+    const box = document.getElementById("rsvpList");
+
+    const list = LEAGUE.standings.filter(p => {
+      if (q) return p.name.toLowerCase().includes(q) || (p.fullName || "").toLowerCase().includes(q);
+      return showAllRsvp || p.reg || rsvpState[p.name];
+    });
+
+    const hidden = LEAGUE.standings.length - list.length;
+    const moreBtn = document.getElementById("btnRsvpAll");
+    moreBtn.hidden = !!q || (!showAllRsvp && hidden === 0);
+    moreBtn.textContent = showAllRsvp ? "Show regulars only" : "+ " + hidden + " more on the invite list";
+
+    box.innerHTML = list.map(p => {
+      const v = rsvpState[p.name] || "";
+      const checked = !!livePlayers[p.name];
+      return '<div class="rsvp-row">' + UI.avatar(p) +
+        '<span class="nm">' + UI.esc(p.name) +
+          (checked ? '<small class="ok">✓ checked in</small>' : "") + '</span>' +
+        '<span class="chips" data-p="' + UI.esc(p.name) + '">' +
+          ["in", "maybe", "out"].map(k =>
+            '<button class="chip ' + (v === k ? "on" : "") + '" data-v="' + k + '">' +
+            k[0].toUpperCase() + k.slice(1) + '</button>').join("") +
+        '</span></div>';
+    }).join("") || '<p class="empty">No one matches that.</p>';
+
+    let i = 0, mb = 0, o = 0;
+    Object.keys(rsvpState).forEach(n => {
+      if (rsvpState[n] === "in") i++;
+      else if (rsvpState[n] === "maybe") mb++;
+      else if (rsvpState[n] === "out") o++;
+    });
+    document.getElementById("tIn").textContent = i;
+    document.getElementById("tMaybe").textContent = mb;
+    document.getElementById("tOut").textContent = o;
+    document.getElementById("stIn").textContent = i;
+    document.getElementById("stKitty").textContent = BPL.money(i * NG.buyin);
+  }
+
+  document.getElementById("rsvpList").addEventListener("click", e => {
+    const btn = e.target.closest(".chip");
+    if (!btn) return;
+    const name = btn.parentNode.dataset.p;
+    const val = btn.dataset.v;
+    const next = rsvpState[name] === val ? null : val;
+    DB.save("RSVP for " + name, () => DB.set(RSVP + "/" + name, next));
+  });
+
+  document.getElementById("rsvpFilter").addEventListener("input", renderRsvp);
+  document.getElementById("btnRsvpAll").addEventListener("click", () => {
+    showAllRsvp = !showAllRsvp; renderRsvp();
+  });
+
+  /* ----------------------------------------------------------- SEAT DRAW */
+  function renderSeats() {
+    const box = document.getElementById("seatOut");
+    const hint = document.getElementById("seatHint");
+
+    if (!liveSeats || !Array.isArray(liveSeats.order) || !liveSeats.order.length) {
+      hint.textContent = "Game night";
+      box.innerHTML = '<div class="card"><p class="seat-empty">' +
+        'Seats get drawn on the night, once ' + UI.esc(LEAGUE.host) + ' has checked everyone in. ' +
+        'They\'ll appear here on every phone at the same moment.</p></div>';
+      return;
+    }
+
+    hint.textContent = "Live";
+    const tables = UI.tables(liveSeats.order, liveSeats.tables);
+    box.innerHTML = '<div class="seat-tables ' + (tables.length > 1 ? "multi" : "") + '">' +
+      tables.map((t, ti) =>
+        '<div class="seat-table" data-t="' + (ti % 4) + '">' +
+        '<h3>Table ' + (ti + 1) + ' · ' + t.length + ' seats</h3>' +
+        t.map((n, si) => {
+          const p = livePlayers[n];
+          const dead = p && p.status === "out";
+          return '<div class="seat' + (dead ? " dead" : "") + '"><span class="num">' + (si + 1) + '</span>' +
+            UI.avatar(n, "sm") + '<span class="nm">' + UI.esc(n) + '</span></div>';
+        }).join("") + '</div>').join("") + '</div>';
+  }
+
+  /* ------------------------------------------------------- LIVE GAME CTA */
+  function renderLive() {
+    const card = document.getElementById("liveCard");
+    const active = Object.keys(livePlayers).filter(n => livePlayers[n].status === "active").length;
+    const total = Object.keys(livePlayers).length;
+
+    if (!total || liveStatus === "final") { card.hidden = true; return; }
+    card.hidden = false;
+    card.innerHTML = '<span class="livedot"></span>' +
+      '<span><strong>Game in progress</strong>' +
+      '<small>' + active + ' of ' + total + ' still standing — open The Table</small></span>' +
+      '<span class="livearrow">→</span>';
+  }
+
+  /* ------------------------------------------------------------ BINDINGS */
+  DB.on(RSVP,             v => { rsvpState   = v || {};   renderRsvp(); });
+  DB.on(LIVE + "/players", v => { livePlayers = v || {};   renderSeats(); renderLive(); renderRsvp(); });
+  DB.on(LIVE + "/seats",   v => { liveSeats   = v || null; renderSeats(); });
+  DB.on(LIVE + "/status",  v => { liveStatus  = v || "";   renderLive(); });
+  DB.on("results",         v => { results     = v || {};   renderStandings(); });
+
+  renderRsvp();
+  renderSeats();
+  renderStandings();
+})();
+</script>
+</body>
+</html>

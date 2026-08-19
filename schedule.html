@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#06120d">
+<title>Schedule — Braelinn Poker League</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="nav"></div>
+
+<div class="wrap">
+  <header class="hero" style="padding-bottom:20px">
+    <p class="hero-eyebrow" id="eyebrow"></p>
+    <h1>Schedule</h1>
+    <p class="hero-sub" id="sub"></p>
+  </header>
+
+  <section>
+    <div class="sec-head"><h2>Game Details</h2><span class="hint">Season <span id="seasonNo"></span></span></div>
+    <div class="card">
+      <div class="stat-row mb">
+        <div class="stat"><span class="n" id="dBuyin">—</span><span class="l">Buy-in</span></div>
+        <div class="stat"><span class="n" id="dRebuy">—</span><span class="l">Rebuy</span></div>
+        <div class="stat"><span class="n" id="dStack">—</span><span class="l">Start Stack</span></div>
+      </div>
+      <p class="tiny muted" id="dNotes" style="margin:0"></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Upcoming</h2><span class="hint" id="upCount"></span></div>
+    <div class="sched" id="upcoming"></div>
+  </section>
+
+  <section id="pastSec" hidden>
+    <div class="sec-head"><h2>Results So Far</h2></div>
+    <div class="sched" id="past"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Blind Structure</h2><span class="hint" id="structLen"></span></div>
+    <div class="card" style="padding:6px 10px">
+      <div class="tbl-scroll">
+        <table class="tbl">
+          <thead><tr><th>Level</th><th>Blinds</th><th>Ante</th><th>Mins</th><th>Elapsed</th></tr></thead>
+          <tbody id="blindBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <p class="tiny muted mt">Edit these in <code>data.js</code> once Nate confirms his real structure.</p>
+  </section>
+</div>
+
+<div id="footer"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="data.js"></script>
+<script src="app-core.js"></script>
+<script src="fx.js"></script>
+<script>
+(function () {
+  "use strict";
+  UI.mount("schedule.html");
+
+  const NG = LEAGUE.nextGame;
+
+  document.getElementById("eyebrow").textContent = "Season " + LEAGUE.season + " · " + LEAGUE.location;
+  document.getElementById("seasonNo").textContent = LEAGUE.season;
+  document.getElementById("sub").textContent =
+    LEAGUE.tagline + " at " + NG.location + ", hosted by " + LEAGUE.host + ".";
+
+  document.getElementById("dBuyin").textContent = BPL.money(NG.buyin);
+  document.getElementById("dRebuy").textContent = BPL.money(NG.rebuy || NG.buyin);
+  document.getElementById("dStack").textContent = BPL.chips(NG.startStack);
+  document.getElementById("dNotes").textContent =
+    NG.notes + " Rebuy stack " + BPL.chips(NG.rebuyStack) + " chips. Field cap " + NG.maxPlayers + ".";
+
+  function row(e, isNext) {
+    const [y, m, d] = e.date.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    const cls = e.completed ? "done" : (isNext ? "next" : "");
+    const tag = e.completed ? '<span class="tag done">Played</span>'
+              : isNext ? '<span class="tag final">Next Up</span>'
+              : '<span class="tag ' + e.type + '">' + e.type + '</span>';
+    return '<div class="sched-row ' + cls + '">' +
+      '<div class="sched-date">' + dt.toLocaleDateString("en-US", { month: "short" }).toUpperCase() +
+        '<span>' + d + '</span></div>' +
+      '<div class="sched-body"><strong>' + UI.esc(e.label) + '</strong><small>' +
+        dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) +
+        (e.note ? " · " + UI.esc(e.note) : "") + '</small></div>' + tag + '</div>';
+  }
+
+  const up = LEAGUE.schedule.filter(e => !e.completed);
+  const past = LEAGUE.schedule.filter(e => e.completed);
+
+  document.getElementById("upCount").textContent =
+    up.length + (up.length === 1 ? " scheduled" : " to go");
+  document.getElementById("upcoming").innerHTML =
+    (up.map((e, i) => row(e, i === 0)).join("") || '<p class="empty">Season complete.</p>') +
+    (up.length < 3
+      ? '<div class="card mt"><p class="tiny muted" style="margin:0">' +
+        '<b>More dates coming.</b> The rest of Season ' + LEAGUE.season +
+        ' shows up here once it\'s set.</p></div>'
+      : "");
+
+  if (past.length) {
+    document.getElementById("pastSec").hidden = false;
+    document.getElementById("past").innerHTML = past.reverse().map(e => row(e, false)).join("");
+  }
+
+  /* Blind structure table with cumulative elapsed time */
+  let elapsed = 0;
+  document.getElementById("structLen").textContent =
+    Math.round(BPL.totalMinutes() / 60 * 10) / 10 + " hrs total";
+  document.getElementById("blindBody").innerHTML = LEAGUE.blinds.map(l => {
+    const start = elapsed;
+    elapsed += l.mins;
+    const hh = Math.floor(start / 60), mm = start % 60;
+    if (l.break) {
+      return '<tr style="background:#60a5fa10"><td colspan="4"><b class="timer-break">☕ ' +
+        UI.esc(l.label || "Break") + '</b> · ' + l.mins + ' min</td>' +
+        '<td class="num">' + hh + 'h' + String(mm).padStart(2, "0") + '</td></tr>';
+    }
+    return '<tr><td class="num">' + l.level + '</td>' +
+      '<td class="num">' + BPL.chips(l.sb) + ' / ' + BPL.chips(l.bb) + '</td>' +
+      '<td class="num">' + (l.ante ? BPL.chips(l.ante) : "—") + '</td>' +
+      '<td class="num">' + l.mins + '</td>' +
+      '<td class="num">' + hh + 'h' + String(mm).padStart(2, "0") + '</td></tr>';
+  }).join("");
+})();
+</script>
+</body>
+</html>

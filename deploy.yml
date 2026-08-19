@@ -1,0 +1,55 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Inject the ElevenLabs key (optional). Add a repo secret named EL_KEY
+      # under Settings -> Secrets and variables -> Actions. If the secret is
+      # missing this writes an empty key and voice features stay off.
+      - name: Inject voice API key
+        run: |
+          cat > voice-config.js <<'EOF'
+          /* AUTO-GENERATED AT DEPLOY TIME — do not edit, do not commit a real key. */
+          const VOICE_CONFIG = {
+            enabled: false,
+            apiKey: "__EL_KEY__",
+            voiceId: "21m00Tcm4TlvDq8ikWAM"
+          };
+          EOF
+          sed -i "s|__EL_KEY__|${{ secrets.EL_KEY }}|" voice-config.js
+          if [ -n "${{ secrets.EL_KEY }}" ]; then
+            sed -i 's|enabled: false|enabled: true|' voice-config.js
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

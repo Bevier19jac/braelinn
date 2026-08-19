@@ -1,0 +1,15 @@
+{
+  "name": "Braelinn Poker League",
+  "short_name": "Braelinn",
+  "description": "Standings, RSVP, seat draw and game-night hub for the Braelinn Poker League.",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#06120d",
+  "theme_color": "#06120d",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

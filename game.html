@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#06120d">
+<title>The Table — Braelinn Poker League</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="nav"></div>
+
+<div class="wrap">
+
+  <!-- ======================================================= THE CLOCK -->
+  <section class="mt">
+    <div class="timer-card" id="clockCard">
+      <div class="timer-level" id="tLevel">Level 1</div>
+      <div class="timer-clock" id="tClock">20:00</div>
+      <div class="timer-blinds" id="tBlinds">50 / 100</div>
+      <div class="timer-ante" id="tAnte"></div>
+      <div class="bar"><i id="tBar" style="width:0%"></i></div>
+      <div class="timer-next" id="tNext"></div>
+      <div>
+        <span class="state-pill stopped" id="tState">Not Started</span>
+        <span class="state-pill stopped" id="phasePill">Check-In</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== ACTION QUEUE -->
+  <section id="queueSec" hidden>
+    <div class="sec-head">
+      <h2>Needs You</h2>
+      <span class="hint" id="queueCount"></span>
+    </div>
+    <div id="queue"></div>
+  </section>
+
+  <!-- =========================================================== TABS -->
+  <div class="tabs">
+    <button data-tab="table" class="on">The Table</button>
+    <button data-tab="money">Money</button>
+    <button data-tab="host">Host</button>
+  </div>
+
+  <!-- ========================================================== TABLE -->
+  <div class="tabpane on" id="pane-table">
+
+    <!-- Player self-report -->
+    <section id="meSec">
+      <div class="card">
+        <div id="meBox"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head">
+        <h2>Still Standing</h2>
+        <span class="hint" id="aliveCount"></span>
+      </div>
+      <div class="trk" id="trkList"></div>
+    </section>
+
+    <section id="finishSec" hidden>
+      <div class="sec-head"><h2>Finished</h2><span class="hint">Busted, best first</span></div>
+      <div class="trk" id="finishList"></div>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>Seats</h2><span class="hint" id="seatHint"></span></div>
+      <div id="seatOut"></div>
+    </section>
+  </div>
+
+  <!-- ========================================================== MONEY -->
+  <div class="tabpane" id="pane-money">
+    <section>
+      <div class="sec-head"><h2>On the Table</h2><span class="hint">Live</span></div>
+      <div class="pool-summary">
+        <div class="stat"><span class="n" id="poGross">$0</span><span class="l">Collected</span></div>
+        <div class="stat"><span class="n" id="poEntries">0</span><span class="l">Entries</span></div>
+        <div class="stat"><span class="n" id="poRebuys">0</span><span class="l">Rebuys</span></div>
+      </div>
+      <p class="tiny muted" id="potNote"></p>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>Payouts</h2><span class="hint" id="payHint"></span></div>
+      <div class="sched" id="payoutList"></div>
+      <p class="tiny muted mt" id="payoutNote"></p>
+    </section>
+
+    <section id="rebuySec">
+      <div class="sec-head"><h2>Rebuys</h2><span class="hint">Host only</span></div>
+      <div class="card">
+        <div class="trk" id="rebuyList"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================== HOST -->
+  <div class="tabpane" id="pane-host">
+
+    <div id="hostLocked" class="card locked">
+      <div class="lk">🔒</div>
+      <h2 class="mb">Tournament Director</h2>
+      <p class="muted tiny mb" id="lockedNote"></p>
+      <button class="btn btn-primary" id="btnUnlock">Enter PIN</button>
+      <p class="tiny muted mt" style="margin-bottom:0">
+        Any device can take over mid-tournament — the game lives in Firebase,
+        not on a phone.
+      </p>
+    </div>
+
+    <div id="hostPanel" hidden>
+
+      <section>
+        <div class="sec-head"><h2>Check-In</h2><span class="hint" id="ciHint"></span></div>
+        <div class="card">
+          <div class="btn-grid mb">
+            <button class="btn btn-primary" id="btnCheckInAll">✓ Check in everyone who RSVP'd</button>
+            <button class="btn" id="btnAddPlayer">+ Add player</button>
+          </div>
+          <div class="trk" id="checkinList"></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="sec-head"><h2>Clock</h2></div>
+        <div class="card">
+          <div class="btn-grid mb">
+            <button class="btn btn-primary" id="btnStart">▶ Start</button>
+            <button class="btn" id="btnPause">⏸ Pause</button>
+          </div>
+          <div class="btn-grid mb">
+            <button class="btn" id="btnPrev">⏮ Level −</button>
+            <button class="btn" id="btnNext">Level + ⏭</button>
+          </div>
+          <div class="btn-grid">
+            <button class="btn" id="btnAdd1">+1 min</button>
+            <button class="btn btn-danger" id="btnResetClock">Reset clock</button>
+          </div>
+          <p class="tiny muted mt" style="margin-bottom:0">
+            The clock is computed from the shared server time, not counted down on
+            this phone. Close the browser, swap devices, lose signal — it stays right.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <div class="sec-head"><h2>Seating</h2></div>
+        <div class="card">
+          <label class="fld" for="tableCount">Tables</label>
+          <select class="inp mb" id="tableCount">
+            <option value="1">1 table</option>
+            <option value="2">2 tables</option>
+            <option value="3">3 tables</option>
+            <option value="4">4 tables</option>
+          </select>
+          <div class="btn-grid mb">
+            <button class="btn btn-primary" id="btnDraw">🎲 Draw seats</button>
+            <button class="btn btn-danger" id="btnClearSeats">Clear</button>
+          </div>
+          <p class="tiny muted" style="margin:0" id="seatNote"></p>
+        </div>
+      </section>
+
+      <section>
+        <div class="sec-head"><h2>Finish</h2></div>
+        <div class="card">
+          <button class="btn btn-primary btn-block mb" id="btnFinalize">🏆 Finalize game</button>
+          <p class="tiny muted" id="finalizeNote"></p>
+          <button class="btn btn-danger btn-block mt" id="btnResetNight">Reset tonight</button>
+          <p class="tiny muted mt" style="margin-bottom:0">
+            Resetting clears tonight's live state only. Finalized results are permanent
+            and are never touched.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <button class="btn btn-block" id="btnLock">🔒 Lock host controls</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+</div>
+
+<div id="footer"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="data.js"></script>
+<script src="app-core.js"></script>
+<script src="fx.js"></script>
+<script src="game-state.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  UI.mount("game.html");
+  Game.start();
+
+  const NG = LEAGUE.nextGame;
+  const ME_KEY = "bpl_me";
+
+  document.getElementById("lockedNote").textContent =
+    "Check-in, the clock, seating and finalizing are " + LEAGUE.host + "'s controls.";
+
+  /* ================================================================ TABS */
+  document.querySelectorAll(".tabs button").forEach(b => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".tabs button").forEach(x => x.classList.remove("on"));
+      document.querySelectorAll(".tabpane").forEach(x => x.classList.remove("on"));
+      b.classList.add("on");
+      document.getElementById("pane-" + b.dataset.tab).classList.add("on");
+    });
+  });
+
+  /* =============================================================== CLOCK */
+  let lastLevelIndex = null;
+
+  function renderClock() {
+    const c = Game.clock();
+
+    /* Announce a level change on every device at once. Derived from the shared
+       clock, so nobody has to broadcast it -- they all reach the same
+       conclusion independently. */
+    if (lastLevelIndex !== null && c.index !== lastLevelIndex && c.running) {
+      FX.levelUp(c.lv.break ? (c.lv.label || "Break")
+                            : BPL.chips(c.lv.sb) + " / " + BPL.chips(c.lv.bb), !!c.lv.break);
+    }
+    lastLevelIndex = c.index;
+    document.getElementById("clockCard").classList.toggle("brk", !!c.lv.break);
+    const secs = Math.ceil(c.remainingMs / 1000);
+    const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+    const ss = String(secs % 60).padStart(2, "0");
+
+    const el = document.getElementById("tClock");
+    el.textContent = mm + ":" + ss;
+    el.className = "timer-clock" + (secs <= 30 ? " crit" : secs <= 120 ? " warn" : "");
+
+    if (c.lv.break) {
+      document.getElementById("tLevel").textContent = "Break";
+      document.getElementById("tBlinds").innerHTML =
+        '<span class="timer-break">☕ ' + UI.esc(c.lv.label || "Break") + '</span>';
+      document.getElementById("tAnte").textContent = "";
+    } else {
+      document.getElementById("tLevel").textContent = "Level " + c.lv.level;
+      document.getElementById("tBlinds").textContent = BPL.chips(c.lv.sb) + " / " + BPL.chips(c.lv.bb);
+      document.getElementById("tAnte").textContent = c.lv.ante ? "Ante " + BPL.chips(c.lv.ante) : "No ante";
+    }
+
+    document.getElementById("tBar").style.width =
+      (c.levelMs ? (1 - c.remainingMs / c.levelMs) * 100 : 0) + "%";
+
+    const nx = LEAGUE.blinds[c.index + 1];
+    document.getElementById("tNext").textContent = c.structureDone
+      ? "Structure complete"
+      : nx ? (nx.break ? "Next: Break (" + nx.mins + " min)"
+                      : "Next: " + BPL.chips(nx.sb) + " / " + BPL.chips(nx.bb) + " · " + nx.mins + " min")
+           : "Final level";
+
+    const pill = document.getElementById("tState");
+    const st = !c.started ? "stopped" : (c.paused ? "paused" : "running");
+    pill.className = "state-pill " + st;
+    pill.textContent = st === "running" ? "Running" : st === "paused" ? "Paused" : "Not Started";
+
+    document.title = (c.running ? mm + ":" + ss + " · " : "") + "The Table — BPL";
+  }
+  setInterval(renderClock, 250);
+
+  /* ================================================================ ME  */
+  function me() { return localStorage.getItem(ME_KEY) || ""; }
+
+  function pickMe() {
+    const roster = LEAGUE.standings.map(p => ({ value: p.name, label: p.name, sub: p.fullName }));
+    return UI.pick("Which one are you?", roster).then(v => {
+      if (v) { localStorage.setItem(ME_KEY, v); render(); }
+      return v;
+    });
+  }
+
+  function renderMe() {
+    const box = document.getElementById("meBox");
+    const S = Game.state();
+    const name = me();
+
+    if (!name) {
+      box.innerHTML = '<p class="tiny muted mb">Tell the app who you are once and the ' +
+        'report button below is yours for the night.</p>' +
+        '<button class="btn btn-primary btn-block" id="btnPickMe">Pick my name</button>';
+      document.getElementById("btnPickMe").onclick = pickMe;
+      return;
+    }
+
+    const p = S.players[name];
+    const pending = Game.pendingReports().find(r => r.name === name);
+
+    let body = '<div class="me-head">' + UI.avatar(name) +
+      '<span class="nm">' + UI.esc(name) + '</span>' +
+      '<button class="btn btn-sm btn-ghost" id="btnNotMe">Not me</button></div>';
+
+    if (!p) {
+      body += '<p class="tiny muted mt">You\'re not checked in yet. Grab ' + UI.esc(LEAGUE.host) +
+        ' when you sit down.</p>';
+    } else if (pending) {
+      body += '<div class="pending mt">⏳ Reported <b>' + (pending.type === "win" ? "WINNER" : "OUT") +
+        '</b> — waiting for ' + UI.esc(LEAGUE.host) + ' to confirm.</div>';
+    } else if (p.status === "out") {
+      const pl = Game.placeOf(name);
+      body += '<div class="pending mt done">Finished ' + (pl ? Game.ordinal(pl) : "—") +
+        '. ' + (p.rebuys ? p.rebuys + " rebuy" + (p.rebuys > 1 ? "s" : "") + "." : "") + '</div>';
+    } else {
+      body += '<button class="btn btn-danger btn-block mt" id="btnImOut">I\'m Out</button>' +
+        '<p class="tiny muted mt" style="margin-bottom:0">This tells ' + UI.esc(LEAGUE.host) +
+        ' — it doesn\'t record your place until he confirms, so a mis-tap costs nothing.</p>';
+    }
+
+    box.innerHTML = body;
+
+    const notMe = document.getElementById("btnNotMe");
+    if (notMe) notMe.onclick = () => { localStorage.removeItem(ME_KEY); render(); };
+
+    const out = document.getElementById("btnImOut");
+    if (out) out.onclick = () => {
+      UI.confirm("Bust out?", "Sends a note to " + LEAGUE.host + ". Nothing is recorded until he confirms.", "I'm out")
+        .then(ok => { if (ok) Game.report(name, "out").then(render); });
+    };
+  }
+
+  /* ======================================================== ACTION QUEUE */
+  function renderQueue() {
+    const sec = document.getElementById("queueSec");
+    if (!Admin.isUnlocked()) { sec.hidden = true; return; }
+
+    const items = [];
+    const S = Game.state();
+
+    Game.pendingReports().forEach(r => {
+      const known = !!S.players[r.name];
+      if (r.type === "out") {
+        items.push({
+          kind: "report",
+          title: UI.esc(r.name) + " reported OUT",
+          sub: known ? "Confirm to record their finishing place."
+                     : r.name + " isn't checked in — check them in first or dismiss.",
+          actions: (known
+            ? '<button class="btn btn-sm btn-primary" data-act="confirmOut" data-n="' + UI.esc(r.name) + '" data-id="' + r.id + '">Confirm</button>'
+            : "") +
+            '<button class="btn btn-sm" data-act="dismiss" data-id="' + r.id + '">Dismiss</button>'
+        });
+      } else {
+        items.push({
+          kind: "report",
+          title: UI.esc(r.name) + " says they won",
+          sub: "Only Finalize records a winner. Check the table first.",
+          actions: '<button class="btn btn-sm" data-act="dismiss" data-id="' + r.id + '">Dismiss</button>'
+        });
+      }
+    });
+
+    const noShow = Game.noShows();
+    if (noShow.length && Game.fieldSize() > 0) {
+      items.push({
+        kind: "info",
+        title: noShow.length + " RSVP'd but never checked in",
+        sub: noShow.join(", "),
+        actions: '<button class="btn btn-sm" data-act="gotoCheckin">Review</button>'
+      });
+    }
+
+    const act = Game.active().length;
+    const seats = S.seats;
+    if (seats && seats.tables > 1 && act > 1 && act <= seats.tables * 5) {
+      items.push({
+        kind: "info",
+        title: act + " players left across " + seats.tables + " tables",
+        sub: "Tables are getting short — consolidating is available.",
+        actions: '<button class="btn btn-sm btn-primary" data-act="consolidate">Consolidate</button>'
+      });
+    }
+
+    if (Game.readyToFinalize()) {
+      items.push({
+        kind: "good",
+        title: "🏆 " + Game.active()[0] + " is the last one standing",
+        sub: "Finalize to record the result and update the season standings.",
+        actions: '<button class="btn btn-sm btn-primary" data-act="finalize">Finalize game</button>'
+      });
+    }
+
+    if (S.status === "final") {
+      items.push({ kind: "good", title: "Game finalized", sub: "Result is recorded. Standings are live.", actions: "" });
+    }
+
+    sec.hidden = false;
+    document.getElementById("queueCount").textContent =
+      items.length ? items.length + (items.length === 1 ? " item" : " items") : "";
+    document.getElementById("queue").innerHTML = items.length
+      ? items.map(i => '<div class="qcard ' + i.kind + '"><div class="qbody"><strong>' + i.title +
+          '</strong><small>' + UI.esc(i.sub) + '</small></div>' +
+          '<div class="qacts">' + i.actions + '</div></div>').join("")
+      : '<div class="card"><p class="empty tiny" style="padding:14px">Nothing needs you right now.</p></div>';
+  }
+
+  document.getElementById("queue").addEventListener("click", e => {
+    const b = e.target.closest("button[data-act]");
+    if (!b || !Admin.require()) return;
+    const a = b.dataset.act;
+
+    if (a === "confirmOut") Game.confirmOut(b.dataset.n, b.dataset.id)
+      .then(place => { FX.eliminated(b.dataset.n, place); render(); });
+    if (a === "dismiss")    Game.dismissReport(b.dataset.id).then(render);
+    if (a === "gotoCheckin") {
+      document.querySelector('.tabs button[data-tab="host"]').click();
+      document.getElementById("checkinList").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    if (a === "consolidate") {
+      const n = Game.active().length;
+      const tc = n <= 10 ? 1 : 2;
+      const w = Game.drawSeats(tc);
+      w.catch(err => UI.toast(err.message, "bad"));
+      Promise.all([w.catch(() => null), FX.shuffle(700)]).then(([ok]) => {
+        if (ok === null) return;
+        UI.toast("Consolidated to " + tc + (tc === 1 ? " table" : " tables"), "ok");
+        render();
+        FX.dealSeats(document.getElementById("seatOut"));
+      });
+    }
+    if (a === "finalize") doFinalize();
+  });
+
+  /* ============================================================= PLAYERS */
+  function renderPlayers() {
+    const S = Game.state();
+    const act = Game.active();
+
+    document.getElementById("aliveCount").textContent =
+      Game.fieldSize() ? act.length + " of " + Game.fieldSize() + " left" : "Nobody checked in";
+
+    document.getElementById("trkList").innerHTML = act.length
+      ? act.sort().map(n => {
+          const p = S.players[n];
+          const rep = Game.pendingReports().find(r => r.name === n && r.type === "out");
+          return '<div class="trk-row ' + (rep ? "pendingrow" : "") + '">' + UI.avatar(n) +
+            '<span class="nm">' + UI.esc(n) +
+              (p.rebuys ? '<small>' + p.rebuys + ' rebuy' + (p.rebuys > 1 ? "s" : "") + '</small>' : "") +
+              (p.late ? '<small>late entry</small>' : "") +
+            '</span>' +
+            (rep ? '<span class="badge pending">Reported out</span>'
+                 : '<span class="badge in">In</span>') +
+            (Admin.isUnlocked()
+              ? '<button class="btn btn-sm btn-danger" data-out="' + UI.esc(n) + '">Out</button>' : "") +
+            '</div>';
+        }).join("")
+      : '<p class="empty">No players checked in yet. Host tab → Check-In.</p>';
+
+    const fin = Game.finishOrder();
+    document.getElementById("finishSec").hidden = !fin.length;
+    document.getElementById("finishList").innerHTML = fin.map(f =>
+      '<div class="trk-row out">' + UI.avatar(f.name) +
+      '<span class="nm">' + UI.esc(f.name) + '</span>' +
+      '<span class="pl">' + Game.ordinal(f.place) + '</span>' +
+      (Admin.isUnlocked()
+        ? '<button class="btn btn-sm" data-back="' + UI.esc(f.name) + '">Undo</button>' : "") +
+      '</div>').join("");
+  }
+
+  document.getElementById("trkList").addEventListener("click", e => {
+    const b = e.target.closest("button[data-out]");
+    if (!b || !Admin.require()) return;
+    const n = b.dataset.out;
+    UI.confirm("Bust out " + n + "?",
+      "Records their finish. Places renumber automatically if anyone joins late.", "Confirm")
+      .then(ok => { if (ok) Game.confirmOut(n).then(place => { FX.eliminated(n, place); render(); }); });
+  });
+
+  document.getElementById("finishList").addEventListener("click", e => {
+    const b = e.target.closest("button[data-back]");
+    if (!b || !Admin.require()) return;
+    Game.reinstate(b.dataset.back).then(render);
+  });
+
+  /* =============================================================== SEATS */
+  function renderSeats() {
+    const S = Game.state();
+    const box = document.getElementById("seatOut");
+    const s = S.seats;
+    document.getElementById("seatHint").textContent =
+      s && s.drawnAt ? "Drawn " + new Date(s.drawnAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
+
+    if (!s || !Array.isArray(s.order) || !s.order.length) {
+      box.innerHTML = '<div class="card"><p class="seat-empty">No draw yet.</p></div>';
+      return;
+    }
+    const tables = UI.tables(s.order, s.tables);
+    box.innerHTML = '<div class="seat-tables ' + (tables.length > 1 ? "multi" : "") + '">' +
+      tables.map((t, ti) =>
+        '<div class="seat-table" data-t="' + (ti % 4) + '"><h3>Table ' + (ti + 1) + '</h3>' +
+        t.map((n, si) => {
+          const p = S.players[n];
+          const dead = p && p.status === "out";
+          return '<div class="seat' + (dead ? " dead" : "") + '"><span class="num">' + (si + 1) + '</span>' +
+            UI.avatar(n, "sm") + '<span class="nm">' + UI.esc(n) + '</span></div>';
+        }).join("") + '</div>').join("") + '</div>';
+  }
+
+  /* =============================================================== MONEY */
+  function renderMoney() {
+    const S = Game.state();
+    const m = Game.pot();
+
+    document.getElementById("poGross").textContent = BPL.money(m.gross);
+    document.getElementById("poEntries").textContent = m.entries;
+    document.getElementById("poRebuys").textContent = m.rebuys;
+
+    document.getElementById("potNote").textContent =
+      m.entries + " × " + BPL.money(NG.buyin) + " buy-in" +
+      (m.rebuys ? " + " + m.rebuys + " × " + BPL.money(NG.rebuy || NG.buyin) + " rebuy" : "") +
+      (m.kitty ? " · " + BPL.money(m.kitty) + " to the season kitty" : "") +
+      " · " + BPL.money(m.net) + " playing for.";
+
+    const amounts = BPL.payoutTable(m.net, m.entries || 1);
+    const splits = BPL.splitsFor(m.entries || 1);
+    document.getElementById("payHint").textContent = splits.length + " paid";
+    document.getElementById("payoutList").innerHTML = amounts.map((a, i) =>
+      '<div class="payout-row"><span class="pl">' + Game.ordinal(i + 1) + '</span>' +
+      '<span class="pc">' + splits[i] + '% · ' + BPL.chips(BPL.pointsFor(i + 1, m.entries || 1)) + ' pts</span>' +
+      '<span class="amt">' + BPL.money(a) + '</span></div>').join("");
+
+    document.getElementById("payoutNote").textContent =
+      "Recalculates as people buy in and rebuy. Rounded to the nearest $5, remainder to 1st — " +
+      "the payouts always add up to the pot exactly.";
+
+    /* Rebuy controls */
+    const sec = document.getElementById("rebuySec");
+    sec.hidden = !Admin.isUnlocked();
+    if (Admin.isUnlocked()) {
+      const names = Game.entrants().sort();
+      document.getElementById("rebuyList").innerHTML = names.length ? names.map(n => {
+        const p = S.players[n];
+        return '<div class="trk-row ' + (p.status === "out" ? "out" : "") + '">' +
+          '<span class="nm">' + UI.esc(n) + '</span>' +
+          '<span class="pl">' + (p.rebuys || 0) + '</span>' +
+          '<button class="btn btn-sm" data-rb-="' + UI.esc(n) + '">−</button>' +
+          '<button class="btn btn-sm btn-primary" data-rb="' + UI.esc(n) + '">+ Rebuy</button></div>';
+      }).join("") : '<p class="empty tiny">Nobody checked in yet.</p>';
+    }
+  }
+
+  document.getElementById("rebuyList").addEventListener("click", e => {
+    const add = e.target.closest("button[data-rb]");
+    const sub = e.target.closest("button[data-rb-]");
+    if (!(add || sub) || !Admin.require()) return;
+    if (add) Game.addRebuy(add.dataset.rb).then(render);
+    if (sub) Game.removeRebuy(sub.getAttribute("data-rb-")).then(render);
+  });
+
+  /* ============================================================ CHECK-IN */
+  function renderCheckin() {
+    const S = Game.state();
+    const rsvpIn = Game.rsvpIn();
+    const notIn = rsvpIn.filter(n => !S.players[n]);
+
+    document.getElementById("ciHint").textContent =
+      Game.fieldSize() + " in · " + notIn.length + " expected";
+
+    const rows = [];
+    Game.entrants().sort().forEach(n => {
+      const p = S.players[n];
+      rows.push('<div class="trk-row">' + UI.avatar(n, "sm") +
+        '<span class="nm">' + UI.esc(n) +
+          (p.late ? '<small>late — no bonus chips</small>' : '<small>+' + NG.earlyBonus + ' bonus chips</small>') +
+        '</span><span class="badge in">Checked in</span>' +
+        '<button class="btn btn-sm btn-danger" data-uncheck="' + UI.esc(n) + '">Remove</button></div>');
+    });
+    notIn.forEach(n => {
+      rows.push('<div class="trk-row out">' + UI.avatar(n, "sm") +
+        '<span class="nm">' + UI.esc(n) + '<small>RSVP\'d In</small></span>' +
+        '<button class="btn btn-sm btn-primary" data-check="' + UI.esc(n) + '">Check in</button></div>');
+    });
+
+    document.getElementById("checkinList").innerHTML =
+      rows.join("") || '<p class="empty tiny">Nobody has RSVP\'d In yet.</p>';
+
+    document.getElementById("btnCheckInAll").disabled = !notIn.length;
+    document.getElementById("btnCheckInAll").textContent = notIn.length
+      ? "✓ Check in all " + notIn.length + " who RSVP'd"
+      : "Everyone who RSVP'd is in";
+  }
+
+  document.getElementById("checkinList").addEventListener("click", e => {
+    const chk = e.target.closest("button[data-check]");
+    const unc = e.target.closest("button[data-uncheck]");
+    if (!(chk || unc) || !Admin.require()) return;
+    if (chk) Game.checkIn(chk.dataset.check, { late: Game.clock().started }).then(render);
+    if (unc) UI.confirm("Remove " + unc.dataset.uncheck + "?", "They'll come off tonight's field.", "Remove")
+      .then(ok => { if (ok) Game.undoCheckIn(unc.dataset.uncheck).then(render); });
+  });
+
+  document.getElementById("btnCheckInAll").onclick = () => {
+    if (!Admin.require()) return;
+    Game.checkInAll(Game.noShows()).then(n => {
+      if (n) UI.toast(n + " checked in", "ok");
+      render();
+    });
+  };
+
+  /* Add anyone — roster player who didn't RSVP, or a late arrival. */
+  document.getElementById("btnAddPlayer").onclick = () => {
+    if (!Admin.require()) return;
+    const S = Game.state();
+    const avail = LEAGUE.standings
+      .filter(p => !S.players[p.name])
+      .map(p => ({ value: p.name, label: p.name, sub: p.fullName }));
+    if (!avail.length) { UI.toast("Everyone on the roster is already in", "info"); return; }
+
+    UI.pick("Add player", avail).then(name => {
+      if (!name) return;
+      const started = Game.clock().started;
+      Game.checkIn(name, { late: started }).then(() => {
+        if (started) {
+          return Game.seatLatecomer(name).then(seat => {
+            UI.toast(name + " added" + (seat ? " — seat " + seat : "") + ", no bonus chips", "ok");
+          });
+        }
+        UI.toast(name + " checked in", "ok");
+      }).then(render);
+    });
+  };
+
+  /* =============================================================== HOST  */
+  function refreshHostUI() {
+    const ok = Admin.isUnlocked();
+    document.getElementById("hostLocked").hidden = ok;
+    document.getElementById("hostPanel").hidden = !ok;
+  }
+
+  document.getElementById("btnUnlock").onclick = () => { if (Admin.require()) render(); };
+  document.getElementById("btnLock").onclick = () => { Admin.lock(); render(); UI.toast("Locked"); };
+  window.addEventListener("bpl:adminchange", render);
+
+  document.getElementById("btnStart").onclick = () => {
+    if (!Admin.require()) return;
+    const c = Game.clock();
+    (c.paused ? Game.timerResume() : Game.timerStart()).then(() => {
+      if (Game.state().status === "checkin") Game.setStatus("running");
+      render();
+    });
+  };
+  document.getElementById("btnPause").onclick = () => {
+    if (!Admin.require()) return;
+    const c = Game.clock();
+    (c.paused ? Game.timerResume() : Game.timerPause()).then(render);
+  };
+  document.getElementById("btnNext").onclick = () => {
+    if (!Admin.require()) return; Game.timerGoto(Game.clock().index + 1).then(render);
+  };
+  document.getElementById("btnPrev").onclick = () => {
+    if (!Admin.require()) return; Game.timerGoto(Game.clock().index - 1).then(render);
+  };
+  document.getElementById("btnAdd1").onclick = () => {
+    if (!Admin.require()) return; Game.timerNudge(60000).then(render);
+  };
+  document.getElementById("btnResetClock").onclick = () => {
+    if (!Admin.require()) return;
+    UI.confirm("Reset the clock?", "Back to Level 1, stopped. Players and results are untouched.", "Reset")
+      .then(ok => { if (ok) Game.timerReset().then(render); });
+  };
+
+  document.getElementById("btnDraw").onclick = () => {
+    if (!Admin.require()) return;
+    const tc = Number(document.getElementById("tableCount").value) || 1;
+    /* Write first, celebrate second. The overlay runs alongside the write and
+       never gates it -- if the animation broke, the seats would still be set. */
+    const write = Game.drawSeats(tc);
+    write.catch(err => UI.toast(err.message, "bad"));
+    Promise.all([write.catch(() => null), FX.shuffle(900)]).then(([ok]) => {
+      if (ok === null) return;
+      document.querySelector('.tabs button[data-tab="table"]').click();
+      render();
+      FX.dealSeats(document.getElementById("seatOut"));
+    });
+  };
+  document.getElementById("btnClearSeats").onclick = () => {
+    if (!Admin.require()) return; Game.clearSeats().then(render);
+  };
+
+  function doFinalize() {
+    if (!Admin.require()) return;
+    if (!Game.readyToFinalize()) {
+      UI.toast("Needs exactly one player still in — " + Game.active().length + " are active", "bad");
+      return;
+    }
+    const winner = Game.active()[0];
+    const m = Game.pot();
+    UI.confirm("Finalize with " + winner + " as winner?",
+      m.entries + " players, " + BPL.money(m.net) + " pot. This writes the permanent record and " +
+      "updates the season standings. It can't be edited afterwards.", "Finalize")
+      .then(ok => {
+        if (!ok) return;
+        Game.finalize().then(rec => {
+          render();
+          FX.winner(rec);          /* only ever after the record is saved */
+        }, err => UI.toast(err.message, "bad"));
+      });
+  }
+  document.getElementById("btnFinalize").onclick = doFinalize;
+
+  document.getElementById("btnResetNight").onclick = () => {
+    if (!Admin.require()) return;
+    UI.confirm("Reset tonight?", "Clears check-ins, seats, clock and eliminations for this date. " +
+      "Finalized results are never deleted.", "Reset everything")
+      .then(ok => { if (ok) Game.resetNight().then(render); });
+  };
+
+  /* ============================================================== RENDER */
+  function render() {
+    const S = Game.state();
+
+    const phase = document.getElementById("phasePill");
+    const map = { checkin: ["Check-In", "stopped"], running: ["Live", "running"], final: ["Complete", "paused"] };
+    const m = map[S.status] || map.checkin;
+    phase.textContent = m[0];
+    phase.className = "state-pill " + m[1];
+
+    refreshHostUI();
+    renderMe();
+    renderQueue();
+    renderPlayers();
+    renderSeats();
+    renderMoney();
+    if (Admin.isUnlocked()) renderCheckin();
+    renderClock();
+
+    const act = Game.active().length;
+    document.getElementById("seatNote").textContent =
+      act ? "Draws from the " + act + " players checked in and still playing — not from RSVPs." : "";
+    document.getElementById("finalizeNote").textContent = Game.readyToFinalize()
+      ? Game.active()[0] + " is last standing. Finalizing records the result."
+      : "Available once one player is left. " + Game.active().length + " still in.";
+
+    const sel = document.getElementById("tableCount");
+    if (document.activeElement !== sel && act) sel.value = String(act <= 10 ? 1 : act <= 20 ? 2 : 3);
+  }
+
+  Game.subscribe(render);
+  render();
+})();
+</script>
+</body>
+</html>
