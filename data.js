@@ -142,7 +142,6 @@ const LEAGUE = {
     date: "2026-09-03",   // Thursday, Sept 3 — Season 7 kickoff
     label: "Event 1 — Season 7 Kickoff",
     time: "8:30 PM",      // CONFIRMED — games always start 8:30
-    location: "Nate's",
     buyin: 30,          // CONFIRMED
     rebuy: 30,          // CONFIRMED — same price for a rebuy or the 6,000-chip add-on
     startStack: 7000,   // CONFIRMED — buy-in gets you 7,000
