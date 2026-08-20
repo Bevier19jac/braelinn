@@ -3,13 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#06120d">
+
+<!-- ===================================================================
+     PUBLIC IDENTITY
+     Every page shares ONE title, description and share image on purpose.
+     Link scrapers (iMessage, WhatsApp, Slack) don't run JavaScript and
+     read only these static tags — so whichever page gets shared, the
+     preview says "Braelinn Poker League", never "Schedule — ...".
+     =================================================================== -->
 <title>Braelinn Poker League</title>
-<link rel="manifest" href="manifest.json">
+<meta name="description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<link rel="canonical" href="https://bevier19jac.github.io/braelinn/">
+
+<meta property="og:site_name" content="Braelinn Poker League">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Braelinn Poker League">
+<meta property="og:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<meta property="og:url" content="https://bevier19jac.github.io/braelinn/">
+<meta property="og:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Braelinn Poker League — Season 7, Peachtree City GA">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Braelinn Poker League">
+<meta name="twitter:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<meta name="twitter:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+
+<!-- ===================================================================
+     INSTALLED-APP BEHAVIOUR
+     apple-touch-icon is what stops iOS screenshotting the page and using
+     that as the home-screen icon. apple-mobile-web-app-title stops iOS
+     labelling the icon from <title>.
+     =================================================================== -->
+<link rel="manifest" href="manifest.json?v=2">
+<meta name="theme-color" content="#06120d">
+<meta name="color-scheme" content="dark">
+
+<link rel="icon" href="favicon.ico?v=2" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Braelinn Poker">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 
@@ -30,7 +75,12 @@
     </div>
 
     <p class="hero-note" id="hnNotes"></p>
-    <div class="countdown" id="countdown" hidden></div>
+    <div class="hero-actions">
+      <div class="countdown" id="countdown" hidden></div>
+      <button class="btn btn-sm btn-ghost" id="btnShare" type="button">
+        <span aria-hidden="true">\u2934</span> Share
+      </button>
+    </div>
   </header>
 
   <!-- ================================================ LIVE GAME BANNER -->
@@ -41,10 +91,10 @@
 
   <!-- ========================================================= NUMBERS -->
   <section>
-    <div class="stat-row">
-      <div class="stat"><span class="n" id="stEvents">0</span><span class="l">Games Played</span></div>
-      <div class="stat"><span class="n" id="stIn">0</span><span class="l">In For Next</span></div>
-      <div class="stat"><span class="n" id="stKitty">$0</span><span class="l">Projected Pot</span></div>
+    <div class="stat-row" id="statRow" data-loading="true">
+      <div class="stat"><span class="n" id="stEvents">&nbsp;</span><span class="l">Games Played</span></div>
+      <div class="stat"><span class="n" id="stIn">&nbsp;</span><span class="l">In For Next</span></div>
+      <div class="stat"><span class="n" id="stKitty">&nbsp;</span><span class="l">Projected Pot</span></div>
     </div>
   </section>
 
@@ -64,7 +114,7 @@
         <span><span class="dot out"></span>Out <b id="tOut">0</b></span>
       </div>
       <p class="tiny muted mt" style="margin-bottom:0">
-        RSVP isn't the same as playing — <span id="hostName"></span> checks people in at the door,
+        RSVP isn't the same as playing — everyone gets checked in at the door,
         and the seat draw runs off who actually turned up.
       </p>
     </div>
@@ -76,6 +126,9 @@
       <h2>Seat Draw</h2>
       <span class="hint" id="seatHint">Game night</span>
     </div>
+    <button class="btn btn-primary btn-block mb" id="btnWhereSit" hidden>
+      <span aria-hidden="true">\u2660</span> Where do I sit?
+    </button>
     <div id="seatOut"></div>
   </section>
 
@@ -112,10 +165,10 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="data.js"></script>
-<script src="app-core.js"></script>
-<script src="fx.js"></script>
+<script src="firebase-config.js?v=2"></script>
+<script src="data.js?v=2"></script>
+<script src="app-core.js?v=2"></script>
+<script src="fx.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -127,18 +180,48 @@
 
   let rsvpState = {}, livePlayers = {}, liveSeats = null, liveStatus = "", results = {};
 
+  /* The stat tiles show a shimmer until BOTH the RSVP list and the results
+     have arrived from Firebase. Showing "0 / $0" before that is a lie —
+     it reads as real data when it just means "not loaded yet". */
+  const loaded = { rsvp: false, results: false };
+  let statsSettled = false;
+
+  function settleStats(offline) {
+    if (statsSettled) return;
+    statsSettled = true;
+    const row = document.getElementById("statRow");
+    if (row) {
+      row.removeAttribute("data-loading");
+      if (offline) row.setAttribute("data-offline", "true");
+    }
+    if (offline) {
+      /* Never leave a shimmer running forever — say plainly that we could not
+         reach Firebase rather than implying the real numbers are zero. */
+      ["stEvents", "stIn", "stKitty"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && !el.textContent.trim()) el.textContent = "—";
+      });
+    }
+  }
+
+  function markLoaded(which) {
+    loaded[which] = true;
+    if (loaded.rsvp && loaded.results) settleStats(false);
+  }
+
+  /* If Firebase hasn't answered in 6 seconds, stop pretending it's coming. */
+  setTimeout(() => settleStats(!statsSettled), 6000);
+
   UI.mount("index.html");
 
   /* ---------------------------------------------------------------- HERO */
-  document.getElementById("heroEyebrow").textContent =
-    "Season " + LEAGUE.season + " · Hosted by " + LEAGUE.host;
+  document.getElementById("heroEyebrow").textContent = "Season " + LEAGUE.season;
   document.getElementById("heroSub").textContent =
     LEAGUE.location + " · " + LEAGUE.tagline + " · " + LEAGUE.standings.length + " on the roster";
   document.getElementById("hnDate").textContent  = BPL.fmtShort(NG.date);
   document.getElementById("hnTime").textContent  = NG.time;
   document.getElementById("hnBuyin").textContent = BPL.money(NG.buyin);
   document.getElementById("hnNotes").textContent = NG.notes || "";
-  document.getElementById("hostName").textContent = LEAGUE.host;
 
   (function countdown() {
     const el = document.getElementById("countdown");
@@ -207,8 +290,7 @@
         'title="' + (Photos.has(p.name) ? "Change" : "Add") + ' photo">' +
         UI.avatar(p, "lg") +
         '<span class="avacam">' + (Photos.has(p.name) ? "✎" : "+") + '</span></button>' +
-      '<div><div class="nm">' + UI.esc(p.fullName || p.name) +
-        (p.host ? ' <span class="tag final">Host</span>' : "") + '</div>' +
+      '<div><div class="nm">' + UI.esc(p.fullName || p.name) + '</div>' +
         '<div class="fn">"' + UI.esc(p.name) + '"</div>' +
         '<div class="st" data-stat="' + UI.esc(p.name) + '"></div>' +
       '</div></div>').join("");
@@ -335,10 +417,13 @@
     const box = document.getElementById("seatOut");
     const hint = document.getElementById("seatHint");
 
+    const btn = document.getElementById("btnWhereSit");
+    if (btn) btn.hidden = !(liveSeats && Array.isArray(liveSeats.order) && liveSeats.order.length);
+
     if (!liveSeats || !Array.isArray(liveSeats.order) || !liveSeats.order.length) {
       hint.textContent = "Game night";
       box.innerHTML = '<div class="card"><p class="seat-empty">' +
-        'Seats get drawn on the night, once ' + UI.esc(LEAGUE.host) + ' has checked everyone in. ' +
+        'Seats get drawn on the night, once everyone is checked in. ' +
         'They\'ll appear here on every phone at the same moment.</p></div>';
       return;
     }
@@ -357,6 +442,13 @@
         }).join("") + '</div>').join("") + '</div>';
   }
 
+  /* --------------------------------------------------------- SEAT LOOKUP */
+  document.getElementById("btnWhereSit").addEventListener("click", () => {
+    UI.seatLookup(liveSeats);
+  });
+
+  document.getElementById("btnShare").addEventListener("click", () => UI.share());
+
   /* ------------------------------------------------------- LIVE GAME CTA */
   function renderLive() {
     const card = document.getElementById("liveCard");
@@ -372,11 +464,11 @@
   }
 
   /* ------------------------------------------------------------ BINDINGS */
-  DB.on(RSVP,             v => { rsvpState   = v || {};   renderRsvp(); });
+  DB.on(RSVP,             v => { rsvpState   = v || {};   renderRsvp(); markLoaded("rsvp"); });
   DB.on(LIVE + "/players", v => { livePlayers = v || {};   renderSeats(); renderLive(); renderRsvp(); });
   DB.on(LIVE + "/seats",   v => { liveSeats   = v || null; renderSeats(); });
   DB.on(LIVE + "/status",  v => { liveStatus  = v || "";   renderLive(); });
-  DB.on("results",         v => { results     = v || {};   renderStandings(); });
+  DB.on("results",         v => { results     = v || {};   renderStandings(); markLoaded("results"); });
 
   renderRsvp();
   renderSeats();

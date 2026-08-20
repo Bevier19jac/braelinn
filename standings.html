@@ -3,13 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<!-- ===================================================================
+     PUBLIC IDENTITY
+     Every page shares ONE title, description and share image on purpose.
+     Link scrapers (iMessage, WhatsApp, Slack) don't run JavaScript and
+     read only these static tags — so whichever page gets shared, the
+     preview says "Braelinn Poker League", never "Schedule — ...".
+     =================================================================== -->
+<title>Braelinn Poker League</title>
+<meta name="description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<link rel="canonical" href="https://bevier19jac.github.io/braelinn/">
+
+<meta property="og:site_name" content="Braelinn Poker League">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Braelinn Poker League">
+<meta property="og:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<meta property="og:url" content="https://bevier19jac.github.io/braelinn/">
+<meta property="og:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Braelinn Poker League — Season 7, Peachtree City GA">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Braelinn Poker League">
+<meta name="twitter:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<meta name="twitter:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+
+<!-- ===================================================================
+     INSTALLED-APP BEHAVIOUR
+     apple-touch-icon is what stops iOS screenshotting the page and using
+     that as the home-screen icon. apple-mobile-web-app-title stops iOS
+     labelling the icon from <title>.
+     =================================================================== -->
+<link rel="manifest" href="manifest.json?v=2">
 <meta name="theme-color" content="#06120d">
-<title>The Chase — Braelinn Poker League</title>
-<link rel="manifest" href="manifest.json">
+<meta name="color-scheme" content="dark">
+
+<link rel="icon" href="favicon.ico?v=2" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Braelinn Poker">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 
@@ -75,16 +120,16 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="data.js"></script>
-<script src="app-core.js"></script>
-<script src="fx.js"></script>
+<script src="firebase-config.js?v=2"></script>
+<script src="data.js?v=2"></script>
+<script src="app-core.js?v=2"></script>
+<script src="fx.js?v=2"></script>
 <script>
 (function () {
   "use strict";
   UI.mount("standings.html");
 
-  document.getElementById("eyebrow").textContent = "Season " + LEAGUE.season + " · " + LEAGUE.host;
+  document.getElementById("eyebrow").textContent = "Season " + LEAGUE.season;
   document.getElementById("seasonNo").textContent = LEAGUE.season;
   document.getElementById("pointsNote").textContent =
     LEAGUE.points.describe + " G = games played, ITM = in the money, Avg = average finish. " +
@@ -120,7 +165,7 @@
     document.getElementById("tbody").innerHTML = rows.map((p, i) =>
       '<tr><td class="num">' + (i + 1) + '</td>' +
       '<td><div class="pname">' + UI.avatar(p, "sm") +
-        '<span><b>' + UI.esc(p.name) + '</b>' + (p.host ? ' <span class="tag final">Host</span>' : "") +
+        '<span><b>' + UI.esc(p.name) + '</b>' +
         '<small>' + UI.esc(p.fullName || "") + '</small></span></div></td>' +
       '<td class="num"><b>' + BPL.chips(p.points) + '</b></td>' +
       '<td class="num">' + p.events + '</td>' +

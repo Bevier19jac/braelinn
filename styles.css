@@ -812,3 +812,98 @@ body::before {
   .fx-conf, .fx-card { animation: none !important; }
   .fx-win, .fx-level, .fx-bust, .fx-shuffle { transition: none !important; }
 }
+
+/* ============================================================================
+   REFINEMENT PASS — seat lookup, loading states, share, focus, rebuy window
+   ========================================================================== */
+
+/* ------------------------------------------------- hero action row ------ */
+.hero-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px;
+}
+.hero-actions .countdown { margin-top: 0; }
+
+/* ------------------------------------------------- loading skeletons ---- */
+/* Showing "0" or "$0" before Firebase answers reads as real data. These tiles
+   shimmer instead until the first snapshot lands. */
+@keyframes skelPulse { 0%,100% { opacity: .35; } 50% { opacity: .7; } }
+
+[data-loading="true"] .stat .n {
+  display: block; min-height: 26px; border-radius: 7px;
+  background: linear-gradient(90deg, #ffffff10, #ffffff1e, #ffffff10);
+  animation: skelPulse 1.3s ease-in-out infinite;
+  color: transparent;
+}
+[data-loading="true"] .stat .l { opacity: .5; }
+
+/* ------------------------------------------------- "where do I sit" ----- */
+.seatfind .seatcard { text-align: center; max-width: 340px; }
+
+.sf-name {
+  font-family: var(--display); font-size: clamp(26px, 9vw, 36px);
+  line-height: 1.05; margin: 4px 0 18px; color: var(--ink);
+}
+.sf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sf-grid > div {
+  padding: 18px 8px 14px; border-radius: var(--radius);
+  background: #00000045; border: 1px solid var(--brass);
+}
+.sf-lab {
+  display: block; font-size: 11px; letter-spacing: .22em;
+  text-transform: uppercase; color: var(--brass); font-weight: 800;
+}
+/* Big enough to read at arm's length across a noisy table. */
+.sf-num {
+  display: block; font-family: var(--mono); font-weight: 700;
+  font-size: clamp(52px, 18vw, 74px); line-height: 1.05; color: var(--brass-hi);
+}
+.sf-none { color: var(--ink-mute); font-size: 14px; margin: 0; }
+
+/* ------------------------------------------------- rebuy window --------- */
+.rebuy-window {
+  margin-top: 12px; padding: 7px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; display: inline-block;
+}
+.rebuy-window.open   { background: #4ade8016; color: var(--ok);    border: 1px solid #4ade8040; }
+.rebuy-window.last   { background: #fbbf2422; color: var(--maybe); border: 1px solid #fbbf2466; }
+.rebuy-window.closed { background: #ffffff0d; color: var(--ink-dim); border: 1px solid var(--line-soft); }
+
+/* ------------------------------------------------- focus visibility ----- */
+/* Keyboard users need to see where they are; mouse users shouldn't get rings. */
+:focus-visible {
+  outline: 3px solid var(--brass-hi);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.btn:focus-visible, .chip:focus-visible, .pickrow:focus-visible {
+  outline: 3px solid var(--brass-hi); outline-offset: 2px;
+}
+
+/* ------------------------------------------------- safe areas ----------- */
+/* Notches and home indicators — without this the nav sits under the notch
+   and the last section hides behind the iPhone home bar in standalone mode. */
+.nav { padding-top: calc(12px + env(safe-area-inset-top)); }
+.wrap {
+  padding-left:  calc(16px + env(safe-area-inset-left));
+  padding-right: calc(16px + env(safe-area-inset-right));
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+.sheet-wrap { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+/* ------------------------------------------------- small-phone tuning --- */
+@media (max-width: 400px) {
+  .hero h1 { font-size: 30px; }
+  .hero-next { gap: 10px; }
+  .stat .n { font-size: 21px; }
+  .chip { min-width: 52px; padding: 5px 8px; font-size: 11px; }
+  .sec-head h2 { font-size: 19px; }
+  .tabs button { font-size: 12px; padding: 9px 4px; }
+}
+
+/* Nothing should scroll sideways except a real data table. */
+html, body { overflow-x: hidden; }
+.tbl-scroll { overflow-x: auto; }
+
+/* A dash rather than a shimmer once we've given up waiting for Firebase. */
+[data-offline="true"] .stat .n { color: var(--ink-dim); }

@@ -12,7 +12,6 @@ const LEAGUE = {
   shortName: "Braelinn",
   abbr: "BPL",
   season: 7,
-  host: "Nate Woods",
   location: "Peachtree City, GA",
 
   /* Short line shown in the hero and on the schedule page. */
@@ -28,7 +27,7 @@ const LEAGUE = {
       active: true,
       type: "special",
       icon: "🏆",
-      text: "Season 7 kicks off Thursday, September 3 at Nate's — cards roll at 8:30. RSVP below."
+      text: "Season 7 kicks off Thursday, September 3 — cards roll at 8:30. RSVP below."
     },
     {
       active: false,
@@ -92,7 +91,7 @@ const LEAGUE = {
      ------------------------------------------------------------------------ */
   standings: [
     /* --- Core 18: everyone who was "Going" to the Season 6 Final --------- */
-    { name: "Nate",      fullName: "Nate Woods",      reg: true, host: true, events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
+    { name: "Nate",      fullName: "Nate Woods",      reg: true, events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
     { name: "Jacob",     fullName: "Jacob Bevier",    reg: true, events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
     { name: "Aaron",     fullName: "Aaron Wright",    reg: true, events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
     { name: "Eric C",    fullName: "Eric Cunningham", reg: true, events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
@@ -145,7 +144,7 @@ const LEAGUE = {
     time: "8:30 PM",      // CONFIRMED — games always start 8:30
     location: "Nate's",
     buyin: 30,          // CONFIRMED
-    rebuy: 30,          // CONFIRMED
+    rebuy: 30,          // CONFIRMED — same price for a rebuy or the 6,000-chip add-on
     startStack: 7000,   // CONFIRMED — buy-in gets you 7,000
     rebuyStack: 6000,   // CONFIRMED — rebuy gets you 6,000 (1k less than a fresh buy-in)
     earlyBonus: 500,    // CONFIRMED — 500 bonus chips for being on time
@@ -163,20 +162,32 @@ const LEAGUE = {
      mins = length of the level. break:true renders as a break instead.
      ------------------------------------------------------------------------ */
   blinds: [
-    { level: 1,  sb: 50,    bb: 100,    ante: 0,    mins: 20 },
-    { level: 2,  sb: 100,   bb: 200,    ante: 0,    mins: 20 },
-    { level: 3,  sb: 150,   bb: 300,    ante: 0,    mins: 20 },
-    { level: 4,  sb: 200,   bb: 400,    ante: 0,    mins: 20 },
-    { level: 0,  sb: 0,     bb: 0,      ante: 0,    mins: 10, break: true, label: "BREAK — Color Up / Consolidate Tables" },
-    { level: 5,  sb: 300,   bb: 600,    ante: 600,  mins: 20 },
-    { level: 6,  sb: 400,   bb: 800,    ante: 800,  mins: 20 },
-    { level: 7,  sb: 500,   bb: 1000,   ante: 1000, mins: 20 },
-    { level: 8,  sb: 800,   bb: 1600,   ante: 1600, mins: 20 },
-    { level: 0,  sb: 0,     bb: 0,      ante: 0,    mins: 10, break: true, label: "BREAK — Final Table Redraw" },
-    { level: 9,  sb: 1000,  bb: 2000,   ante: 2000, mins: 15 },
-    { level: 10, sb: 1500,  bb: 3000,   ante: 3000, mins: 15 },
-    { level: 11, sb: 2000,  bb: 4000,   ante: 4000, mins: 15 },
-    { level: 12, sb: 3000,  bb: 6000,   ante: 6000, mins: 15 },
+    /* CONFIRMED: starts 50/100, 20-minute levels, and runs up to 300/600
+       just before the first break. No 150/300 level.
+
+       The first break is the REBUY / ADD-ON deadline — last chance to rebuy
+       or buy 6,000 more chips. After it, the game plays down.
+
+       Levels 5+ below (antes, the shorter levels, the second break) are still
+       a reasonable guess — confirm and edit. */
+    { level: 1,  sb: 50,    bb: 100,    ante: 0,     mins: 20 },
+    { level: 2,  sb: 100,   bb: 200,    ante: 0,     mins: 20 },
+    { level: 3,  sb: 200,   bb: 400,    ante: 0,     mins: 20 },
+    { level: 4,  sb: 300,   bb: 600,    ante: 0,     mins: 20 },
+    { level: 0,  sb: 0,     bb: 0,      ante: 0,     mins: 10, break: true,
+      label: "BREAK — Last Rebuy / Add-On (6,000 chips)", lastRebuy: true },
+
+    { level: 5,  sb: 400,   bb: 800,    ante: 800,   mins: 20 },
+    { level: 6,  sb: 600,   bb: 1200,   ante: 1200,  mins: 20 },
+    { level: 7,  sb: 800,   bb: 1600,   ante: 1600,  mins: 20 },
+    { level: 8,  sb: 1000,  bb: 2000,   ante: 2000,  mins: 20 },
+    { level: 0,  sb: 0,     bb: 0,      ante: 0,     mins: 10, break: true,
+      label: "BREAK — Colour Up / Consolidate Tables" },
+
+    { level: 9,  sb: 1500,  bb: 3000,   ante: 3000,  mins: 15 },
+    { level: 10, sb: 2000,  bb: 4000,   ante: 4000,  mins: 15 },
+    { level: 11, sb: 3000,  bb: 6000,   ante: 6000,  mins: 15 },
+    { level: 12, sb: 4000,  bb: 8000,   ante: 8000,  mins: 15 },
     { level: 13, sb: 5000,  bb: 10000,  ante: 10000, mins: 15 },
     { level: 14, sb: 8000,  bb: 16000,  ante: 16000, mins: 15 },
     { level: 15, sb: 10000, bb: 20000,  ante: 20000, mins: 15 }

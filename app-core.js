@@ -273,8 +273,7 @@
 
     require() {
       if (Admin.isUnlocked()) return true;
-      const host = (typeof LEAGUE !== "undefined" && LEAGUE.host) ? LEAGUE.host : "Host";
-      const entered = window.prompt("Host PIN — " + host + " only:");
+      const entered = window.prompt("Enter PIN:");
       if (entered === null) return false;
       if (Admin.unlock(entered)) { UI.toast("Host controls unlocked", "ok"); return true; }
       UI.toast("Wrong PIN", "bad");
@@ -306,7 +305,7 @@
 
     footer() {
       return '<footer class="footer">' +
-        '<p>' + LEAGUE.name + ' · Season ' + LEAGUE.season + ' · Hosted by ' + LEAGUE.host + '</p>' +
+        '<p>' + LEAGUE.name + ' · Season ' + LEAGUE.season + '</p>' +
         '<p class="footer-mode">Sync: <span id="syncMode"></span></p></footer>';
     },
 
@@ -434,6 +433,91 @@
         wrap.querySelector("[data-no]").onclick = () => done(false);
         wrap.onclick = e => { if (e.target === wrap) done(false); };
       });
+    },
+
+    /**
+     * "Where do I sit?" — the one thing a player needs in a loud room.
+     * Deliberately huge: table and seat are readable from across the table
+     * without anyone squinting at a phone. Uses the existing seat draw data;
+     * no accounts, no extra Firebase paths.
+     *
+     * seats = { tables, order:[names] }  (exactly what the draw already writes)
+     */
+    seatLookup(seats, preferredName) {
+      if (!seats || !Array.isArray(seats.order) || !seats.order.length) {
+        UI.toast("No seat draw yet", "info");
+        return Promise.resolve(null);
+      }
+
+      const tables = UI.tables(seats.order, seats.tables || 1);
+      const find = name => {
+        for (let t = 0; t < tables.length; t++) {
+          const i = tables[t].indexOf(name);
+          if (i !== -1) return { table: t + 1, seat: i + 1 };
+        }
+        return null;
+      };
+
+      const show = name => {
+        const at = find(name);
+        const wrap = document.createElement("div");
+        wrap.className = "sheet-wrap seatfind";
+        wrap.innerHTML = at
+          ? '<div class="sheet seatcard">' +
+              '<p class="sf-name">' + UI.esc(name) + '</p>' +
+              '<div class="sf-grid">' +
+                '<div><span class="sf-lab">Table</span><b class="sf-num">' + at.table + '</b></div>' +
+                '<div><span class="sf-lab">Seat</span><b class="sf-num">' + at.seat + '</b></div>' +
+              '</div>' +
+              '<button class="btn btn-block mt" data-again>Someone else</button>' +
+              '<button class="btn btn-primary btn-block mt" data-close>Got it</button>' +
+            '</div>'
+          : '<div class="sheet seatcard">' +
+              '<p class="sf-name">' + UI.esc(name) + '</p>' +
+              '<p class="sf-none">Not in this draw.</p>' +
+              '<button class="btn btn-block mt" data-again>Look up someone else</button>' +
+              '<button class="btn btn-primary btn-block mt" data-close>Close</button>' +
+            '</div>';
+        document.body.appendChild(wrap);
+        const done = () => wrap.remove();
+        wrap.querySelector("[data-close]").onclick = done;
+        wrap.querySelector("[data-again]").onclick = () => { done(); ask(); };
+        wrap.onclick = e => { if (e.target === wrap) done(); };
+      };
+
+      const ask = () => UI.pick("Who are you?",
+        seats.order.map(n => ({ value: n, label: n }))).then(n => { if (n) {
+          try { localStorage.setItem("bpl_me", n); } catch (_) {}
+          show(n);
+        } });
+
+      let me = preferredName;
+      if (!me) { try { me = localStorage.getItem("bpl_me"); } catch (_) {} }
+      if (me && seats.order.indexOf(me) !== -1) show(me); else ask();
+      return Promise.resolve(true);
+    },
+
+    /**
+     * Share the league. Uses the native share sheet where available (phones),
+     * falls back to copying the link. Always shares the ROOT url and the
+     * league name, never the current page — one public identity.
+     */
+    share() {
+      const data = {
+        title: "Braelinn Poker League",
+        text: "Season standings, RSVP, schedule and game-night hub for the Braelinn Poker League.",
+        url: "https://bevier19jac.github.io/braelinn/"
+      };
+      if (navigator.share) {
+        return navigator.share(data).catch(() => {});
+      }
+      if (navigator.clipboard) {
+        return navigator.clipboard.writeText(data.url)
+          .then(() => UI.toast("Link copied", "ok"))
+          .catch(() => UI.toast(data.url, "info"));
+      }
+      UI.toast(data.url, "info");
+      return Promise.resolve();
     },
 
     /** Simple single-choice picker sheet. items: [{value,label,sub}] */

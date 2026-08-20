@@ -3,13 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<!-- ===================================================================
+     PUBLIC IDENTITY
+     Every page shares ONE title, description and share image on purpose.
+     Link scrapers (iMessage, WhatsApp, Slack) don't run JavaScript and
+     read only these static tags — so whichever page gets shared, the
+     preview says "Braelinn Poker League", never "Schedule — ...".
+     =================================================================== -->
+<title>Braelinn Poker League</title>
+<meta name="description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<link rel="canonical" href="https://bevier19jac.github.io/braelinn/">
+
+<meta property="og:site_name" content="Braelinn Poker League">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Braelinn Poker League">
+<meta property="og:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<meta property="og:url" content="https://bevier19jac.github.io/braelinn/">
+<meta property="og:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Braelinn Poker League — Season 7, Peachtree City GA">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Braelinn Poker League">
+<meta name="twitter:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<meta name="twitter:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+
+<!-- ===================================================================
+     INSTALLED-APP BEHAVIOUR
+     apple-touch-icon is what stops iOS screenshotting the page and using
+     that as the home-screen icon. apple-mobile-web-app-title stops iOS
+     labelling the icon from <title>.
+     =================================================================== -->
+<link rel="manifest" href="manifest.json?v=2">
 <meta name="theme-color" content="#06120d">
-<title>The Table — Braelinn Poker League</title>
-<link rel="manifest" href="manifest.json">
+<meta name="color-scheme" content="dark">
+
+<link rel="icon" href="favicon.ico?v=2" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Braelinn Poker">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 
@@ -26,6 +71,7 @@
       <div class="timer-ante" id="tAnte"></div>
       <div class="bar"><i id="tBar" style="width:0%"></i></div>
       <div class="timer-next" id="tNext"></div>
+      <div class="rebuy-window" id="rebuyWindow" hidden></div>
       <div>
         <span class="state-pill stopped" id="tState">Not Started</span>
         <span class="state-pill stopped" id="phasePill">Check-In</span>
@@ -46,7 +92,7 @@
   <div class="tabs">
     <button data-tab="table" class="on">The Table</button>
     <button data-tab="money">Money</button>
-    <button data-tab="host">Host</button>
+    <button data-tab="host">Control</button>
   </div>
 
   <!-- ========================================================== TABLE -->
@@ -74,6 +120,9 @@
 
     <section>
       <div class="sec-head"><h2>Seats</h2><span class="hint" id="seatHint"></span></div>
+      <button class="btn btn-primary btn-block mb" id="btnWhereSit" hidden>
+        <span aria-hidden="true">\u2660</span> Where do I sit?
+      </button>
       <div id="seatOut"></div>
     </section>
   </div>
@@ -97,7 +146,7 @@
     </section>
 
     <section id="rebuySec">
-      <div class="sec-head"><h2>Rebuys</h2><span class="hint">Host only</span></div>
+      <div class="sec-head"><h2>Rebuys &amp; Add-Ons</h2><span class="hint">Behind the PIN</span></div>
       <div class="card">
         <div class="trk" id="rebuyList"></div>
       </div>
@@ -109,7 +158,7 @@
 
     <div id="hostLocked" class="card locked">
       <div class="lk">🔒</div>
-      <h2 class="mb">Tournament Director</h2>
+      <h2 class="mb">Tournament Control</h2>
       <p class="muted tiny mb" id="lockedNote"></p>
       <button class="btn btn-primary" id="btnUnlock">Enter PIN</button>
       <p class="tiny muted mt" style="margin-bottom:0">
@@ -186,7 +235,7 @@
 
       <section>
         <div class="card">
-          <button class="btn btn-block" id="btnLock">🔒 Lock host controls</button>
+          <button class="btn btn-block" id="btnLock">🔒 Lock controls</button>
         </div>
       </section>
     </div>
@@ -198,11 +247,11 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="data.js"></script>
-<script src="app-core.js"></script>
-<script src="fx.js"></script>
-<script src="game-state.js"></script>
+<script src="firebase-config.js?v=2"></script>
+<script src="data.js?v=2"></script>
+<script src="app-core.js?v=2"></script>
+<script src="fx.js?v=2"></script>
+<script src="game-state.js?v=2"></script>
 <script>
 (function () {
   "use strict";
@@ -214,7 +263,7 @@
   const ME_KEY = "bpl_me";
 
   document.getElementById("lockedNote").textContent =
-    "Check-in, the clock, seating and finalizing are " + LEAGUE.host + "'s controls.";
+    "Check-in, the clock, seating and finalizing live behind the PIN.";
 
   /* ================================================================ TABS */
   document.querySelectorAll(".tabs button").forEach(b => {
@@ -270,12 +319,41 @@
                       : "Next: " + BPL.chips(nx.sb) + " / " + BPL.chips(nx.bb) + " · " + nx.mins + " min")
            : "Final level";
 
+    /* Rebuy / add-on window: open until the break flagged lastRebuy in the
+       blind structure. Money decision, so it gets its own banner rather than
+       being buried in the schedule page. */
+    const rw = document.getElementById("rebuyWindow");
+    if (rw) {
+      const levels = LEAGUE.blinds;
+      const closeIdx = levels.findIndex(l => l.lastRebuy);
+      if (closeIdx === -1) {
+        rw.hidden = true;
+      } else if (c.index < closeIdx) {
+        let msLeft = c.remainingMs;
+        for (let i = c.index + 1; i < closeIdx; i++) msLeft += levels[i].mins * 60000;
+        const mins = Math.ceil(msLeft / 60000);
+        rw.hidden = false;
+        rw.className = "rebuy-window open";
+        rw.textContent = "Rebuys & add-ons open — " + mins + " min left";
+      } else if (c.index === closeIdx) {
+        rw.hidden = false;
+        rw.className = "rebuy-window last";
+        rw.textContent = "LAST CALL — rebuy or add on now";
+      } else {
+        rw.hidden = false;
+        rw.className = "rebuy-window closed";
+        rw.textContent = "Rebuys closed";
+      }
+    }
+
     const pill = document.getElementById("tState");
     const st = !c.started ? "stopped" : (c.paused ? "paused" : "running");
     pill.className = "state-pill " + st;
     pill.textContent = st === "running" ? "Running" : st === "paused" ? "Paused" : "Not Started";
 
-    document.title = (c.running ? mm + ":" + ss + " · " : "") + "The Table — BPL";
+    /* Keep the league name in the tab title even while the clock runs, so a
+       shared or bookmarked tab never reads as a stray page. */
+    document.title = (c.running ? mm + ":" + ss + " · " : "") + "Braelinn Poker League";
   }
   setInterval(renderClock, 250);
 
@@ -311,19 +389,18 @@
       '<button class="btn btn-sm btn-ghost" id="btnNotMe">Not me</button></div>';
 
     if (!p) {
-      body += '<p class="tiny muted mt">You\'re not checked in yet. Grab ' + UI.esc(LEAGUE.host) +
-        ' when you sit down.</p>';
+      body += '<p class="tiny muted mt">You\'re not checked in yet — you\'ll get added at the table.</p>';
     } else if (pending) {
       body += '<div class="pending mt">⏳ Reported <b>' + (pending.type === "win" ? "WINNER" : "OUT") +
-        '</b> — waiting for ' + UI.esc(LEAGUE.host) + ' to confirm.</div>';
+        '</b> — waiting on confirmation.</div>';
     } else if (p.status === "out") {
       const pl = Game.placeOf(name);
       body += '<div class="pending mt done">Finished ' + (pl ? Game.ordinal(pl) : "—") +
         '. ' + (p.rebuys ? p.rebuys + " rebuy" + (p.rebuys > 1 ? "s" : "") + "." : "") + '</div>';
     } else {
       body += '<button class="btn btn-danger btn-block mt" id="btnImOut">I\'m Out</button>' +
-        '<p class="tiny muted mt" style="margin-bottom:0">This tells ' + UI.esc(LEAGUE.host) +
-        ' — it doesn\'t record your place until he confirms, so a mis-tap costs nothing.</p>';
+        '<p class="tiny muted mt" style="margin-bottom:0">This just sends a report — your place ' +
+        'isn\'t recorded until it\'s confirmed, so a mis-tap costs nothing.</p>';
     }
 
     box.innerHTML = body;
@@ -333,7 +410,7 @@
 
     const out = document.getElementById("btnImOut");
     if (out) out.onclick = () => {
-      UI.confirm("Bust out?", "Sends a note to " + LEAGUE.host + ". Nothing is recorded until he confirms.", "I'm out")
+      UI.confirm("Bust out?", "Sends a report. Nothing is recorded until it's confirmed.", "I'm out")
         .then(ok => { if (ok) Game.report(name, "out").then(render); });
     };
   }
@@ -496,6 +573,8 @@
     const S = Game.state();
     const box = document.getElementById("seatOut");
     const s = S.seats;
+    const wsBtn = document.getElementById("btnWhereSit");
+    if (wsBtn) wsBtn.hidden = !(s && Array.isArray(s.order) && s.order.length);
     document.getElementById("seatHint").textContent =
       s && s.drawnAt ? "Drawn " + new Date(s.drawnAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
 
@@ -514,6 +593,10 @@
             UI.avatar(n, "sm") + '<span class="nm">' + UI.esc(n) + '</span></div>';
         }).join("") + '</div>').join("") + '</div>';
   }
+
+  document.getElementById("btnWhereSit").addEventListener("click", () => {
+    UI.seatLookup(Game.state().seats, me() || null);
+  });
 
   /* =============================================================== MONEY */
   function renderMoney() {
@@ -553,7 +636,7 @@
           '<span class="nm">' + UI.esc(n) + '</span>' +
           '<span class="pl">' + (p.rebuys || 0) + '</span>' +
           '<button class="btn btn-sm" data-rb-="' + UI.esc(n) + '">−</button>' +
-          '<button class="btn btn-sm btn-primary" data-rb="' + UI.esc(n) + '">+ Rebuy</button></div>';
+          '<button class="btn btn-sm btn-primary" data-rb="' + UI.esc(n) + '">+ Add</button></div>';
       }).join("") : '<p class="empty tiny">Nobody checked in yet.</p>';
     }
   }
