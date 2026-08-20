@@ -38,6 +38,24 @@ jobs:
             sed -i 's|enabled: false|enabled: true|' voice-config.js
           fi
 
+      # ------------------------------------------------------------------
+      # AUTOMATIC CACHE BUSTING
+      # Browsers cache styles.css / *.js by URL. A hand-edited "?v=2" only
+      # works if somebody remembers to bump it, and somebody never does --
+      # that is exactly how a phone ends up running last week's code on
+      # game night. Stamp every asset URL with the commit SHA instead, so
+      # any deploy that changes a file also changes its URL. Nothing to
+      # remember, nothing to bump.
+      # ------------------------------------------------------------------
+      - name: Stamp asset URLs with the commit SHA
+        run: |
+          STAMP="${GITHUB_SHA:0:12}"
+          for f in *.html; do
+            sed -i -E "s/\.(css|js)\?v=[A-Za-z0-9._-]+/.\1?v=$STAMP/g" "$f"
+          done
+          echo "Stamped asset URLs with v=$STAMP"
+          grep -o 'v=[A-Za-z0-9]*' index.html | sort -u
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

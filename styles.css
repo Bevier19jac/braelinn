@@ -912,3 +912,151 @@ html, body { overflow-x: hidden; }
    specificity — so elements toggled via .hidden need this explicitly. */
 .livecard[hidden] { display: none !important; }
 .btn[hidden]      { display: none !important; }
+.roster[hidden]   { display: none !important; }
+#preSec[hidden], #tableSec[hidden], #statSec[hidden] { display: none !important; }
+
+/* ============================================================================
+   ALIVE PASS — felt, card red, and a hero that acts like a poster.
+   The app was one hue on flat black and read like a spreadsheet. Everything
+   below is presentation only: no element here owns or reports game state.
+   ========================================================================== */
+
+:root {
+  --card-red:   #e0403f;
+  --card-red-hi:#ff6b63;
+  --chip-green: #1f7a4d;
+  --chip-black: #16181c;
+}
+
+/* --- FELT ---------------------------------------------------------------
+   A real table has weave and a lit centre. Two hairline gradients at very
+   low alpha plus a vignette; cheap, no images, and it stops the page from
+   reading as flat black. */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image:
+    repeating-linear-gradient( 45deg, rgba(255,255,255,.014) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,.05)       0 1px, transparent 1px 3px);
+}
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(120% 80% at 50% 0%, transparent 40%, rgba(0,0,0,.55) 100%);
+}
+
+/* --- HERO ---------------------------------------------------------------- */
+.hero { position: relative; overflow: hidden; }
+
+/* Faint card-suit corner mark, like the pip on a playing card. */
+.hero-pip {
+  position: absolute; right: -18px; top: -10px;
+  font-size: 190px; line-height: 1; pointer-events: none;
+  color: var(--card-red); opacity: .10;
+  transform: rotate(9deg);
+}
+
+.hero-eyebrow { position: relative; }
+
+/* THE COUNTDOWN — the most interesting fact on the page, sized like it. */
+.hero-count {
+  position: relative;
+  margin: 18px 0 4px;
+  padding: 16px 0 14px;
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+.hc-label {
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--brass); margin-bottom: 8px;
+}
+.hc-when {
+  font-family: var(--display); font-size: clamp(21px, 6.4vw, 30px);
+  line-height: 1.1; margin-bottom: 12px;
+}
+.hc-when small {
+  display: block; font-family: var(--font); font-size: 13px;
+  font-weight: 500; color: var(--ink-mute); letter-spacing: 0; margin-top: 4px;
+}
+.hc-units { display: flex; gap: 8px; }
+.hc-u {
+  flex: 1; min-width: 0; text-align: center;
+  padding: 9px 4px 7px;
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: linear-gradient(180deg, #ffffff09, #ffffff03);
+}
+.hc-u b {
+  display: block; font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: clamp(20px, 6vw, 26px); line-height: 1.05; color: var(--brass-hi);
+}
+.hc-u span {
+  display: block; font-size: 9px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-dim); margin-top: 3px;
+}
+/* Tonight: the countdown stops being a countdown and starts being an alarm. */
+.hero-count.is-today .hc-u b { color: var(--card-red-hi); }
+.hero-count.is-today .hc-label { color: var(--card-red-hi); }
+
+/* --- CHIP ROW ------------------------------------------------------------
+   Buy-in / rebuy / bonus, shown as chips instead of a stack of tiny labels. */
+.chiprow {
+  position: relative;
+  display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+}
+.chipfact {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: #ffffff06;
+}
+.chipfact .cf-t { line-height: 1.15; }
+.chipfact .cf-k {
+  display: block; font-size: 9px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-dim);
+}
+.chipfact .cf-v { display: block; font-size: 14px; font-weight: 700; }
+
+/* Hand-drawn chip: coloured disc with edge notches and an inner ring. */
+.chip2 {
+  width: 26px; height: 26px; flex: none; border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 8px; font-weight: 800; color: #fff;
+  box-shadow: inset 0 0 0 3px #ffffff2e, inset 0 0 0 4px #00000038,
+              0 2px 5px rgba(0,0,0,.5);
+  background:
+    repeating-conic-gradient(#ffffff40 0deg 12deg, transparent 12deg 45deg),
+    var(--chip-c, var(--chip-green));
+}
+.chip2.green { --chip-c: var(--chip-green); }
+.chip2.red   { --chip-c: var(--card-red); }
+.chip2.black {
+  --chip-c: #23262c; color: var(--brass-hi);
+  background: repeating-conic-gradient(#d9ab5266 0deg 12deg, transparent 12deg 45deg), #23262c;
+  box-shadow: inset 0 0 0 3px #d9ab5252, inset 0 0 0 4px #00000048, 0 2px 5px rgba(0,0,0,.5);
+}
+
+/* --- PRE-SEASON --------------------------------------------------------
+   A table of thirty-four zeroes is not a standings table, it is a wall. */
+.preseason { text-align: center; padding: 26px 18px; }
+.preseason .ps-suits {
+  font-size: 30px; letter-spacing: 6px; margin-bottom: 12px;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.5));
+}
+.preseason .ps-suits .r { color: var(--card-red); }
+.preseason .ps-suits .b { color: var(--ink); }
+.preseason h3 { font-size: 21px; margin-bottom: 6px; }
+.preseason p  { color: var(--ink-mute); font-size: 14px; margin: 0 auto; max-width: 46ch; }
+.ps-meta {
+  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px;
+}
+.ps-meta span {
+  font-size: 12px; padding: 6px 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: #ffffff06; color: var(--ink-mute);
+}
+.ps-meta b { color: var(--brass-hi); }
+
+/* --- COLLAPSIBLE SECTION ------------------------------------------------ */
+.sec-toggle {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--brass-hi);
+}
+.sec-toggle::after { content: " ▾"; }
+.sec-toggle[aria-expanded="true"]::after { content: " ▴"; }

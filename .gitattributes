@@ -1,0 +1,6 @@
+# The zip-and-extract round trip through Windows rewrote every line ending,
+# which made a one-line change show up as a 5,687-line diff. Normalize to LF
+# in the repo so commits show what actually changed.
+* text=auto eol=lf
+*.png binary
+*.ico binary

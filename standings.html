@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -67,7 +67,7 @@
     <p class="hero-sub" id="sub"></p>
   </header>
 
-  <section>
+  <section id="statSec">
     <div class="stat-row">
       <div class="stat"><span class="n" id="sGames">0</span><span class="l">Games Played</span></div>
       <div class="stat"><span class="n" id="sPlayers">0</span><span class="l">Have Played</span></div>
@@ -75,7 +75,20 @@
     </div>
   </section>
 
-  <section>
+  <!-- Before the first game there is nothing to rank. Showing 34 rows of
+       zeroes is worse than showing nothing, so show the season instead. -->
+  <section id="preSec" hidden>
+    <div class="card preseason">
+      <div class="ps-suits" aria-hidden="true">
+        <span class="b">♠</span><span class="r">♥</span><span class="r">♦</span><span class="b">♣</span>
+      </div>
+      <h3 id="psTitle">Season 7 starts here</h3>
+      <p id="psBody"></p>
+      <div class="ps-meta" id="psMeta"></div>
+    </div>
+  </section>
+
+  <section id="tableSec">
     <div class="sec-head">
       <h2>Season <span id="seasonNo"></span></h2>
       <span class="hint"><button class="btn btn-sm" id="btnToggle">Show everyone</button></span>
@@ -105,25 +118,16 @@
     <div id="gamesList"></div>
   </section>
 
-  <section id="emptySec">
-    <div class="card">
-      <p class="empty" style="padding:24px 12px">
-        No games recorded yet.<br><br>
-        <span class="tiny muted">Standings build themselves. When a tournament is finalized on
-        the Game Night page, the result lands here automatically — nobody edits a file.</span>
-      </p>
-    </div>
-  </section>
 </div>
 
 <div id="footer"></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=2"></script>
-<script src="data.js?v=2"></script>
-<script src="app-core.js?v=2"></script>
-<script src="fx.js?v=2"></script>
+<script src="firebase-config.js?v=3"></script>
+<script src="data.js?v=3"></script>
+<script src="app-core.js?v=3"></script>
+<script src="fx.js?v=3"></script>
 <script>
 (function () {
   "use strict";
@@ -133,7 +137,8 @@
   document.getElementById("seasonNo").textContent = LEAGUE.season;
   document.getElementById("pointsNote").textContent =
     LEAGUE.points.describe + " G = games played, ITM = in the money, Avg = average finish. " +
-    "Every number here comes from finalized games.";
+    "Every number comes from finalized games. Ties are broken by wins, then ITM " +
+    "finishes, then average finish — players level on all of those are shown as tied (T).";
 
   let sortKey = "points", showAll = false, agg = null;
 
@@ -144,26 +149,56 @@
     document.getElementById("sPlayers").textContent = agg.players.filter(p => p.events).length;
 
     const hasGames = agg.gamesPlayed > 0;
-    document.getElementById("emptySec").hidden = hasGames;
-    document.getElementById("gamesSec").hidden = !hasGames;
-
     document.getElementById("sub").textContent = hasGames
       ? agg.gamesPlayed + (agg.gamesPlayed === 1 ? " game" : " games") + " in the books."
-      : "Season " + LEAGUE.season + " hasn't started. Everyone's level at zero.";
+      : "Season " + LEAGUE.season + " hasn't started. Nothing to rank yet.";
+    document.getElementById("gamesSec").hidden = !hasGames;
+    document.getElementById("tableSec").hidden = !hasGames;
+    document.getElementById("preSec").hidden   = hasGames;
+    document.getElementById("statSec").hidden  = !hasGames;
+
+    if (!hasGames) {
+      const g = BPL.currentGame();
+      const field = LEAGUE.standings.length;
+      document.getElementById("psTitle").textContent =
+        "Season " + LEAGUE.season + " starts here";
+      document.getElementById("psBody").textContent =
+        "No cards have been dealt yet, so there is nothing to rank. " +
+        "The table fills in the moment the first game is finalized.";
+      const bits = [];
+      if (g) bits.push("First game <b>" + UI.esc(BPL.fmtShort(g.date)) + "</b>");
+      bits.push("<b>" + LEAGUE.schedule.length + "</b> events scheduled");
+      bits.push("<b>" + field + "</b> on the roster");
+      bits.push("<b>" + BPL.money(LEAGUE.nextGame.buyin) + "</b> a seat");
+      document.getElementById("psMeta").innerHTML =
+        bits.map(b => "<span>" + b + "</span>").join("");
+      return;
+    }
 
     let rows = agg.players.slice();
     if (!showAll) rows = rows.filter(p => p.reg || p.events > 0);
 
-    rows.sort((a, b) => {
-      if (sortKey === "avgPlace") return (a.avgPlace || 999) - (b.avgPlace || 999);
-      return (b[sortKey] - a[sortKey]) || (b.points - a.points) || a.name.localeCompare(b.name);
-    });
+    /* Default view uses the real ranking (points, wins, cashes, avg finish)
+       with genuine ties sharing a rank. Clicking a column header is just a
+       sort of that column and shows plain row numbers. */
+    let ranked;
+    if (sortKey === "points") {
+      ranked = BPL.rankPlayers(rows);
+    } else {
+      ranked = rows.slice().sort((a, b) =>
+        sortKey === "avgPlace"
+          ? (a.avgPlace || 999) - (b.avgPlace || 999)
+          : (b[sortKey] - a[sortKey]) || (b.points - a.points) || a.name.localeCompare(b.name)
+      ).map((p, i) => Object.assign({}, p, { rank: i + 1, tied: false }));
+    }
 
+    /* Leader is only unambiguous if nobody is tied with them. */
+    const lead = ranked[0];
     document.getElementById("sLeader").textContent =
-      hasGames && rows.length ? rows[0].name : "—";
+      !hasGames || !lead ? "—" : (lead.tied ? "Tied" : lead.name);
 
-    document.getElementById("tbody").innerHTML = rows.map((p, i) =>
-      '<tr><td class="num">' + (i + 1) + '</td>' +
+    document.getElementById("tbody").innerHTML = ranked.map((p, i) =>
+      '<tr><td class="num">' + (p.tied ? "T" + p.rank : p.rank) + '</td>' +
       '<td><div class="pname">' + UI.avatar(p, "sm") +
         '<span><b>' + UI.esc(p.name) + '</b>' +
         '<small>' + UI.esc(p.fullName || "") + '</small></span></div></td>' +

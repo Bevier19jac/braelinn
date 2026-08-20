@@ -115,6 +115,7 @@
             "field":       { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 100" },
             "winner":      { ".validate": "newData.isString()" },
             "finalizedAt": { ".validate": "newData.isNumber()" },
+            "type":        { ".validate": "newData.isString()" },
 
             "finish": {
               "$row": {

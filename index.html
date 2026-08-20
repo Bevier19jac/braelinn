@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
@@ -64,19 +64,21 @@
 
   <!-- ============================================================ HERO -->
   <header class="hero">
+    <div class="hero-pip" aria-hidden="true">♥</div>
     <p class="hero-eyebrow" id="heroEyebrow">Season 7</p>
     <h1>Braelinn<br>Poker League</h1>
     <p class="hero-sub" id="heroSub"></p>
 
-    <div class="hero-next">
-      <div><div class="k">Next Game</div><div class="v" id="hnDate">—</div></div>
-      <div><div class="k">Cards Roll</div><div class="v" id="hnTime">—</div></div>
-      <div><div class="k">Buy-in</div><div class="v" id="hnBuyin">—</div></div>
+    <div class="hero-count" id="heroCount">
+      <div class="hc-label" id="hcLabel">Next Game</div>
+      <div class="hc-when" id="hcWhen">—</div>
+      <div class="hc-units" id="hcUnits" role="timer" aria-live="off"></div>
     </div>
+
+    <div class="chiprow" id="chipRow"></div>
 
     <p class="hero-note" id="hnNotes"></p>
     <div class="hero-actions">
-      <div class="countdown" id="countdown" hidden></div>
       <button class="btn btn-sm btn-ghost" id="btnShare" type="button">
         <span aria-hidden="true">↗</span> Share
       </button>
@@ -154,9 +156,15 @@
   <section>
     <div class="sec-head">
       <h2>The Roster</h2>
-      <span class="hint" id="rosterCount"></span>
+      <span class="hint">
+        <span id="rosterCount"></span>
+        <button class="sec-toggle" id="btnRoster" type="button"
+                aria-expanded="false" aria-controls="roster">Show</button>
+      </span>
     </div>
-    <div class="roster" id="roster"></div>
+    <!-- Every one of these names is already in the RSVP list above. Collapsed
+         by default so the page isn't the same 34 people twice. -->
+    <div class="roster" id="roster" hidden></div>
   </section>
 
 </div>
@@ -165,10 +173,10 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=2"></script>
-<script src="data.js?v=2"></script>
-<script src="app-core.js?v=2"></script>
-<script src="fx.js?v=2"></script>
+<script src="firebase-config.js?v=3"></script>
+<script src="data.js?v=3"></script>
+<script src="app-core.js?v=3"></script>
+<script src="fx.js?v=3"></script>
 <script>
 (function () {
   "use strict";
@@ -217,32 +225,69 @@
   /* ---------------------------------------------------------------- HERO */
   document.getElementById("heroEyebrow").textContent = "Season " + LEAGUE.season;
   document.getElementById("heroSub").textContent =
-    LEAGUE.location + " · " + LEAGUE.tagline + " · " + LEAGUE.standings.length + " on the roster";
-  document.getElementById("hnDate").textContent  = BPL.fmtShort(NG.date);
-  document.getElementById("hnTime").textContent  = NG.time;
-  document.getElementById("hnBuyin").textContent = BPL.money(NG.buyin);
-  document.getElementById("hnNotes").textContent = NG.notes || "";
+    LEAGUE.location + " · " + LEAGUE.standings.length + " players";
+  /* NG.notes repeats the chip row word for word -- don't say it twice. */
+  document.getElementById("hnNotes").textContent = "";
+
+  /* Full date as the headline, time underneath. This is the one fact that
+     actually matters on this page, so it gets the biggest type. */
+  (function () {
+    const [y, m, d] = NG.date.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    document.getElementById("hcWhen").innerHTML =
+      UI.esc(dt.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })) +
+      '<small>Cards roll at ' + UI.esc(NG.time || "8:30") +
+      (NG.label ? " · " + UI.esc(NG.label) : "") + '</small>';
+  })();
+
+  /* Money, as chips. Same three numbers, but a poker table's language. */
+  (function () {
+    const facts = [
+      { c: "green", n: String(NG.buyin), k: "Buy-in",
+        v: BPL.money(NG.buyin) + " · " + BPL.chips(NG.startStack) },
+      { c: "red",   n: String(NG.rebuy), k: "Rebuy",
+        v: BPL.money(NG.rebuy) + " · " + BPL.chips(NG.rebuyStack) },
+      { c: "black", n: String(NG.earlyBonus), k: "On time",
+        v: "+" + BPL.chips(NG.earlyBonus) + " chips" }
+    ];
+    document.getElementById("chipRow").innerHTML = facts.map(f =>
+      '<div class="chipfact"><span class="chip2 ' + f.c + '" aria-hidden="true">' + f.n + '</span>' +
+      '<span class="cf-t"><span class="cf-k">' + UI.esc(f.k) + '</span>' +
+      '<span class="cf-v">' + UI.esc(f.v) + '</span></span></div>').join("");
+  })();
 
   (function countdown() {
-    const el = document.getElementById("countdown");
+    const box   = document.getElementById("heroCount");
+    const units = document.getElementById("hcUnits");
+    const label = document.getElementById("hcLabel");
     const [y, m, d] = NG.date.split("-").map(Number);
     const t = (NG.time || "8:30 PM").match(/(\d+):(\d+)\s*(AM|PM)/i);
     let hh = t ? Number(t[1]) % 12 : 20;
     if (t && /pm/i.test(t[3])) hh += 12;
     const target = new Date(y, m - 1, d, hh, t ? Number(t[2]) : 0, 0);
+    const cell = (n, l) => '<div class="hc-u"><b>' + n + '</b><span>' + l + '</span></div>';
 
+    /* Display only. The clock that runs the tournament lives on the game
+       page and is derived from server time -- this never touches it. */
     function tick() {
       const ms = target - new Date();
-      if (ms <= 0) { el.textContent = "🃏 Game night is here"; el.hidden = false; return; }
+      if (ms <= 0) {
+        box.classList.add("is-today");
+        label.textContent = "Tonight";
+        units.innerHTML = '<div class="hc-u" style="flex:1"><b>♠ ♥ ♦ ♣</b>' +
+                          '<span>Cards are in the air</span></div>';
+        return;
+      }
       const days = Math.floor(ms / 86400000);
       const hrs  = Math.floor(ms % 86400000 / 3600000);
       const mins = Math.floor(ms % 3600000 / 60000);
-      el.textContent = days > 0
-        ? "⏳ " + days + "d " + hrs + "h until cards roll"
-        : "⏳ " + hrs + "h " + mins + "m until cards roll";
-      el.hidden = false;
+      box.classList.toggle("is-today", days === 0);
+      label.textContent = days === 0 ? "Tonight" : "Next Game";
+      units.innerHTML = (days > 0 ? cell(days, days === 1 ? "day" : "days") : "") +
+                        cell(hrs, hrs === 1 ? "hour" : "hours") +
+                        cell(mins, "min");
     }
-    tick(); setInterval(tick, 60000);
+    tick(); setInterval(tick, 30000);
   })();
 
   /* -------------------------------------------------------- ANNOUNCEMENT */
@@ -320,6 +365,17 @@
   Photos.onChange(renderRoster);
   renderRoster();
 
+  (function () {
+    const btn = document.getElementById("btnRoster");
+    const box = document.getElementById("roster");
+    btn.addEventListener("click", () => {
+      const open = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", String(!open));
+      btn.textContent = open ? "Show" : "Hide";
+      box.hidden = open;
+    });
+  })();
+
   /* ----------------------------------------------------------- STANDINGS */
   function renderStandings() {
     const agg = BPL.aggregate(results);
@@ -343,12 +399,10 @@
       return;
     }
 
-    const top = agg.players.filter(p => p.events)
-      .sort((a, b) => b.points - a.points || b.wins - a.wins || a.name.localeCompare(b.name))
-      .slice(0, 5);
+    const top = BPL.rankPlayers(agg.players.filter(p => p.events)).slice(0, 5);
 
-    box.innerHTML = top.map((p, i) =>
-      '<div class="stand-row"><span class="rk">' + (i + 1) + '</span>' + UI.avatar(p) +
+    box.innerHTML = top.map((p) =>
+      '<div class="stand-row"><span class="rk">' + (p.tied ? "T" + p.rank : p.rank) + '</span>' + UI.avatar(p) +
       '<span class="nm">' + UI.esc(p.name) + '<small>' + p.events + ' games · ' + p.wins + ' wins</small></span>' +
       '<span class="pts">' + BPL.chips(p.points) + '</span></div>').join("");
   }

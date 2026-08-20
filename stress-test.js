@@ -273,6 +273,196 @@ async function playGame(gameNo) {
   return { field, pot: rec.pot, rebuys: rec.rebuys, winner: rec.winner };
 }
 
+
+
+/* ============================================================================
+   TARGETED EDGE-CASE TESTS
+   Specific scenarios rather than random play, so a regression names itself.
+   ========================================================================== */
+async function scenarios() {
+  const F = [];
+  const chk = (c, m, d) => { if (!c) F.push({ msg: m, detail: d }); };
+
+  async function fresh(names) {
+    const ctx = loadEngine();
+    ctx.Game.start();
+    for (const n of names) await ctx.Game.checkIn(n, {});
+    return ctx;
+  }
+  const roster = n => {
+    const ctx = loadEngine();
+    return ctx.LEAGUE.standings.map(p => p.name).slice(0, n);
+  };
+
+  /* ---- field sizes: 2, 8, 20, 36 -------------------------------------- */
+  for (const size of [2, 8, 20, 34]) {
+    const names = roster(size);
+    const ctx = await fresh(names);
+    const { Game, BPL } = ctx;
+    while (Game.active().length > 1) await Game.confirmOut(Game.active()[0]);
+    const rec = await Game.finalize();
+    const places = rec.finish.map(f => f.place).sort((a, b) => a - b);
+    chk(rec.field === size, `field ${size}: wrong field size`, { got: rec.field });
+    chk(places.every((p, i) => p === i + 1), `field ${size}: places not 1..N`, { places });
+    chk(rec.finish[0].points === size * 300, `field ${size}: winner points wrong`,
+        { got: rec.finish[0].points, expect: size * 300 });
+    const paid = rec.finish.reduce((s, f) => s + (f.winnings || 0), 0);
+    chk(paid === rec.pot, `field ${size}: payouts != pot`, { paid, pot: rec.pot });
+    chk(rec.type === "regular", `field ${size}: event type not preserved`, { type: rec.type });
+  }
+
+  /* ---- bust then REBUY: must not leave a phantom finishing place ------- */
+  {
+    const names = roster(6);
+    const ctx = await fresh(names);
+    const { Game } = ctx;
+    const victim = names[0];
+    await Game.confirmOut(victim);
+    chk(Game.busted().includes(victim), "rebuy: victim should be out first", {});
+    await Game.addRebuy(victim);
+    chk(Game.active().includes(victim), "rebuy: player not back in", {});
+    chk(!Game.busted().includes(victim), "rebuy: still counted as busted", {});
+    chk(Game.state().players[victim].bustAt == null,
+        "rebuy: stale bustAt left behind (phantom finishing place)",
+        { bustAt: Game.state().players[victim].bustAt });
+    chk(Game.finishOrder().every(f => f.name !== victim),
+        "rebuy: player still appears in finishing order", {});
+    // play it out — places must still be clean
+    while (Game.active().length > 1) await Game.confirmOut(Game.active()[0]);
+    const rec = await Game.finalize();
+    const places = rec.finish.map(f => f.place).sort((a, b) => a - b);
+    chk(places.every((p, i) => p === i + 1), "rebuy: places corrupted after rebuy", { places });
+    chk(rec.rebuys === 1, "rebuy: rebuy not counted in money", { rebuys: rec.rebuys });
+  }
+
+  /* ---- mistaken elimination then reinstate ----------------------------- */
+  {
+    const names = roster(7);
+    const ctx = await fresh(names);
+    const { Game } = ctx;
+    await Game.confirmOut(names[2]);
+    await Game.reinstate(names[2]);
+    chk(Game.active().includes(names[2]), "reinstate: not active again", {});
+    chk(Game.state().players[names[2]].bustAt == null, "reinstate: bustAt not cleared", {});
+    while (Game.active().length > 1) await Game.confirmOut(Game.active()[0]);
+    const rec = await Game.finalize();
+    const places = rec.finish.map(f => f.place).sort((a, b) => a - b);
+    chk(places.every((p, i) => p === i + 1), "reinstate: places corrupted", { places });
+  }
+
+  /* ---- late entry after busts ------------------------------------------ */
+  {
+    const names = roster(8);
+    const ctx = await fresh(names);
+    const { Game, LEAGUE } = ctx;
+    await Game.confirmOut(names[0]);
+    await Game.confirmOut(names[1]);
+    const late = LEAGUE.standings.map(p => p.name).find(n => !names.includes(n));
+    await Game.checkIn(late, { late: true });
+    chk(Game.state().players[late].bonus === false, "late: got on-time bonus chips", {});
+    while (Game.active().length > 1) await Game.confirmOut(Game.active()[0]);
+    const rec = await Game.finalize();
+    const places = rec.finish.map(f => f.place).sort((a, b) => a - b);
+    chk(rec.field === 9, "late: field should be 9", { got: rec.field });
+    chk(places.every((p, i) => p === i + 1), "late: places not 1..N", { places });
+  }
+
+  /* ---- seat draw balance: 17 players / 2 tables should be 9 + 8 -------- */
+  {
+    const ctx = loadEngine();
+    const t = ctx.UI.tables(Array.from({ length: 17 }, (_, i) => "P" + i), 2);
+    const sizes = t.map(x => x.length).sort((a, b) => b - a);
+    chk(sizes[0] - sizes[1] <= 1, "seats: 17/2 unbalanced", { sizes });
+    const t3 = ctx.UI.tables(Array.from({ length: 20 }, (_, i) => "P" + i), 3);
+    const s3 = t3.map(x => x.length).sort((a, b) => b - a);
+    chk(s3[0] - s3[1] <= 1, "seats: 20/3 unbalanced", { sizes: s3 });
+  }
+
+  /* ---- latecomer seating must not unbalance tables --------------------- */
+  {
+    const ctx = loadEngine();
+    for (const n of [17, 18, 19, 20]) {
+      const t = ctx.UI.tables(Array.from({ length: n }, (_, i) => "P" + i), 2);
+      const sizes = t.map(x => x.length);
+      chk(Math.max(...sizes) - Math.min(...sizes) <= 1,
+          `latecomer: appending to ${n} players unbalanced the tables`, { sizes });
+    }
+  }
+
+  /* ---- finalization guards --------------------------------------------- */
+  {
+    const names = roster(5);
+    const ctx = await fresh(names);
+    const { Game } = ctx;
+    let threw = false;
+    try { await Game.finalize(); } catch (e) { threw = true; }
+    chk(threw, "finalize: allowed with more than one player active", {});
+    while (Game.active().length > 1) await Game.confirmOut(Game.active()[0]);
+    const rec = await Game.finalize();
+    chk(!!rec, "finalize: failed with exactly one active", {});
+    const names2 = rec.finish.map(f => f.name);
+    chk(new Set(names2).size === names2.length, "finalize: duplicate player in results", {});
+  }
+
+  /* ---- season policy: raw history untouched, standings recomputable ---- */
+  {
+    const ctx = loadEngine();
+    const { BPL, LEAGUE } = ctx;
+    const results = {
+      "2026-09-03": { gameId:"a", date:"2026-09-03", type:"regular", field:10, pot:300, winner:"Nate", finalizedAt:1,
+        finish:[{place:1,name:"Nate",points:3000,winnings:150,itm:true},
+                {place:2,name:"Jacob",points:2700,winnings:100,itm:true}] },
+      "2026-09-17": { gameId:"b", date:"2026-09-17", type:"regular", field:10, pot:300, winner:"Jacob", finalizedAt:2,
+        finish:[{place:1,name:"Jacob",points:3000,winnings:150,itm:true},
+                {place:10,name:"Nate",points:300,winnings:0,itm:false}] }
+    };
+    const agg = BPL.aggregate(results);
+    const nate  = agg.players.find(p => p.name === "Nate");
+    const jacob = agg.players.find(p => p.name === "Jacob");
+    chk(nate.points === 3300, "policy: cumulative total wrong for Nate", { got: nate.points });
+    chk(jacob.points === 5700, "policy: cumulative total wrong for Jacob", { got: jacob.points });
+    chk(nate.rawPoints === 3300, "policy: rawPoints must always be the full total", { got: nate.rawPoints });
+
+    // switching the policy must recompute from the same untouched history
+    LEAGUE.seasonScoring = { mode: "bestN", n: 1 };
+    const agg2 = BPL.aggregate(results);
+    const nate2 = agg2.players.find(p => p.name === "Nate");
+    chk(nate2.points === 3000, "policy: bestN did not apply", { got: nate2.points });
+    chk(nate2.rawPoints === 3300, "policy: raw history was altered by policy change",
+        { got: nate2.rawPoints });
+    chk(results["2026-09-03"].finish[0].points === 3000,
+        "policy: stored event result was mutated", {});
+    LEAGUE.seasonScoring = { mode: "cumulative" };
+  }
+
+  /* ---- tie handling ----------------------------------------------------- */
+  {
+    const ctx = loadEngine();
+    const { BPL } = ctx;
+    const ranked = BPL.rankPlayers([
+      { name:"Aaron", points:5700, wins:0, cashes:1, avgPlace:3 },
+      { name:"Nate",  points:6000, wins:1, cashes:1, avgPlace:2 },
+      { name:"Jacob", points:6000, wins:1, cashes:1, avgPlace:2 }
+    ]);
+    chk(ranked[0].rank === 1 && ranked[1].rank === 1,
+        "ties: genuinely tied players should share rank 1",
+        { ranks: ranked.map(r => r.name + ":" + r.rank + (r.tied ? "(T)" : "")) });
+    chk(ranked[2].rank === 3, "ties: next player should be rank 3, not 2",
+        { got: ranked[2].rank });
+    chk(ranked[0].tied && ranked[1].tied && !ranked[2].tied, "ties: tied flag wrong", {});
+
+    // a real tiebreak must NOT show as tied
+    const r2 = BPL.rankPlayers([
+      { name:"Zed", points:6000, wins:1, cashes:2, avgPlace:2 },
+      { name:"Abe", points:6000, wins:1, cashes:1, avgPlace:2 }
+    ]);
+    chk(r2[0].name === "Zed" && !r2[0].tied,
+        "ties: more ITM finishes should win the tiebreak, not alphabetical", {});
+  }
+
+  return F;
+}
+
 /* ------------------------------------------------------------- runner --- */
 (async () => {
   const ITER = 5, PER = 10;
@@ -297,6 +487,73 @@ async function playGame(gameNo) {
   console.log(`Field sizes: ${Math.min(...stats.map(s => s.field))}–${Math.max(...stats.map(s => s.field))}`);
   console.log(`Pots: $${Math.min(...stats.map(s => s.pot))}–$${Math.max(...stats.map(s => s.pot))}`);
   console.log(`Total rebuys across all games: ${stats.reduce((s, x) => s + x.rebuys, 0)}`);
+
+  /* ---------------------------------------------------------------------
+     JUNK IN /results MUST NOT MOVE THE STANDINGS.
+     /results is append-only, so a stray or test record written there can
+     never be deleted. It therefore has to be harmless: the season table
+     must ignore anything that is not a real finalized tournament. Also
+     covers Firebase handing back `finish` as an object rather than an
+     array, which happens whenever the row keys are not a clean 0..n-1.
+     ------------------------------------------------------------------- */
+  function junkRecordsIgnored() {
+    const { BPL } = loadEngine();
+    const fails = [];
+    const chk = (c, m, d) => { if (!c) fails.push({ msg: m, detail: d || {} }); };
+    const good = {
+      gameId: "g1", date: "2026-09-03", finalizedAt: 10, field: 3, winner: "Nate",
+      finish: [{ place: 1, name: "Nate", points: 900 },
+               { place: 2, name: "Jacob", points: 600 },
+               { place: 3, name: "Aaron", points: 300 }]
+    };
+    const base = BPL.aggregate({ g1: good });
+    const find = (a, n) => a.players.filter(p => p.name === n)[0];
+
+    const junk = {
+      g1: good,
+      RULECHECK:   { gameId: "x", date: "x", finalizedAt: 1, field: 2, winner: "x",
+                     finish: [{ place: 1, name: "RULECHECK", points: 999999 }] }, // 1 row
+      HALF:        { gameId: "y", date: "2026-01-01" },                            // no finish
+      NOTFINAL:    { gameId: "z", date: "2026-01-02", field: 3, winner: "Nate",
+                     finish: [{ place: 1, name: "Nate", points: 50000 },
+                              { place: 2, name: "Jacob", points: 1 }] },           // no finalizedAt
+      BADROW:      { gameId: "w", date: "2026-01-03", finalizedAt: 3, field: 2, winner: "Nate",
+                     finish: [{ place: 1, name: "Nate", points: 70000 },
+                              { name: "Jacob", points: 1 }] },                     // row with no place
+      NOTOBJ:      "hello",
+      NOTHING:     null
+    };
+    const dirty = BPL.aggregate(junk);
+
+    chk(dirty.gamesPlayed === 1, "junk: only the real game should count",
+        { got: dirty.gamesPlayed });
+    chk(!find(dirty, "RULECHECK"), "junk: a test record must not appear as a player");
+    chk(find(dirty, "Nate").points === find(base, "Nate").points,
+        "junk: junk records must not change anyone's points",
+        { clean: find(base, "Nate").points, dirty: find(dirty, "Nate").points });
+    chk(find(dirty, "Nate").events === 1, "junk: junk records must not inflate games played",
+        { got: find(dirty, "Nate").events });
+
+    /* Firebase returns an object, not an array, when keys are not 0..n-1. */
+    const asObject = { g1: Object.assign({}, good,
+      { finish: { a: good.finish[0], b: good.finish[1], c: good.finish[2] } }) };
+    const objAgg = BPL.aggregate(asObject);
+    chk(objAgg.gamesPlayed === 1, "junk: object-shaped finish must still count",
+        { got: objAgg.gamesPlayed });
+    chk(objAgg.players.filter(p => p.name === "Nate")[0].points === 900,
+        "junk: object-shaped finish must score identically",
+        { got: objAgg.players.filter(p => p.name === "Nate")[0].points });
+    return fails;
+  }
+
+  console.log("\n== TARGETED EDGE CASES ==");
+  const scen = (await scenarios()).concat(junkRecordsIgnored());
+  if (scen.length) {
+    scen.forEach(f => console.log("  ❌ " + f.msg + "  " + JSON.stringify(f.detail)));
+    failures.push(...scen);
+  } else {
+    console.log("  ✅ all edge-case scenarios passed");
+  }
 
   if (failures.length) {
     console.log(`\n❌ ${failures.length} INVARIANT VIOLATIONS`);

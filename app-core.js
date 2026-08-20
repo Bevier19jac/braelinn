@@ -248,10 +248,18 @@
     SESSION_KEY: "bpl_admin_ok",
     pin: (typeof DEFAULT_ADMIN_PIN !== "undefined" ? DEFAULT_ADMIN_PIN : "1234"),
 
+    /* True while the league is still running on the shipped seed PIN. */
+    usingDefault: true,
+
     watch() {
       DB.on("config/pin", val => {
         if (val) Admin.pin = String(val);
         else DB.set("config/pin", Admin.pin);
+        Admin.usingDefault = String(Admin.pin).trim() === "1234";
+        if (Admin.usingDefault) {
+          console.warn("[BPL] Host PIN is still the default 1234 -- anyone with the link can unlock host controls. " +
+                       "Change it at Firebase Console -> Realtime Database -> leagues/braelinn/config/pin");
+        }
       });
     },
 
@@ -275,7 +283,15 @@
       if (Admin.isUnlocked()) return true;
       const entered = window.prompt("Enter PIN:");
       if (entered === null) return false;
-      if (Admin.unlock(entered)) { UI.toast("Host controls unlocked", "ok"); return true; }
+      if (Admin.unlock(entered)) {
+        UI.toast("Host controls unlocked", "ok");
+        /* Nag, every session, until it is changed. Easy to forget, and the
+           link is public -- the default PIN protects nothing. */
+        if (Admin.usingDefault) setTimeout(function () {
+          UI.toast("PIN is still 1234 - change it", "bad");
+        }, 2200);
+        return true;
+      }
       UI.toast("Wrong PIN", "bad");
       return false;
     }
