@@ -133,7 +133,8 @@
   document.getElementById("seasonNo").textContent = LEAGUE.season;
   document.getElementById("pointsNote").textContent =
     LEAGUE.points.describe + " G = games played, ITM = in the money, Avg = average finish. " +
-    "Every number here comes from finalized games.";
+    "Every number comes from finalized games. Ties are broken by wins, then ITM " +
+    "finishes, then average finish — players level on all of those are shown as tied (T).";
 
   let sortKey = "points", showAll = false, agg = null;
 
@@ -154,16 +155,27 @@
     let rows = agg.players.slice();
     if (!showAll) rows = rows.filter(p => p.reg || p.events > 0);
 
-    rows.sort((a, b) => {
-      if (sortKey === "avgPlace") return (a.avgPlace || 999) - (b.avgPlace || 999);
-      return (b[sortKey] - a[sortKey]) || (b.points - a.points) || a.name.localeCompare(b.name);
-    });
+    /* Default view uses the real ranking (points, wins, cashes, avg finish)
+       with genuine ties sharing a rank. Clicking a column header is just a
+       sort of that column and shows plain row numbers. */
+    let ranked;
+    if (sortKey === "points") {
+      ranked = BPL.rankPlayers(rows);
+    } else {
+      ranked = rows.slice().sort((a, b) =>
+        sortKey === "avgPlace"
+          ? (a.avgPlace || 999) - (b.avgPlace || 999)
+          : (b[sortKey] - a[sortKey]) || (b.points - a.points) || a.name.localeCompare(b.name)
+      ).map((p, i) => Object.assign({}, p, { rank: i + 1, tied: false }));
+    }
 
+    /* Leader is only unambiguous if nobody is tied with them. */
+    const lead = ranked[0];
     document.getElementById("sLeader").textContent =
-      hasGames && rows.length ? rows[0].name : "—";
+      !hasGames || !lead ? "—" : (lead.tied ? "Tied" : lead.name);
 
-    document.getElementById("tbody").innerHTML = rows.map((p, i) =>
-      '<tr><td class="num">' + (i + 1) + '</td>' +
+    document.getElementById("tbody").innerHTML = ranked.map((p, i) =>
+      '<tr><td class="num">' + (p.tied ? "T" + p.rank : p.rank) + '</td>' +
       '<td><div class="pname">' + UI.avatar(p, "sm") +
         '<span><b>' + UI.esc(p.name) + '</b>' +
         '<small>' + UI.esc(p.fullName || "") + '</small></span></div></td>' +

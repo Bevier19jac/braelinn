@@ -197,9 +197,33 @@ const LEAGUE = {
      Points for a finish = (number of players you outlasted + 1) * 300
      i.e. in a 20-player field: 1st = 6000, 2nd = 5700, ... last = 300
      ------------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------------
+     SEASON SCORING POLICY
+     ----------------------------------------------------------------------------
+     How the season table is built FROM the permanent event results. This is a
+     separate decision from how an event scores — event points are recorded
+     permanently and are never rewritten.
+
+         event result  ->  raw points  ->  season scoring policy  ->  standings
+
+     mode "cumulative" (current): every event counts, nothing dropped.
+
+     RULE NEEDS CONFIRMATION — the Season 7 policy has NOT been decided.
+     Other modes are implemented but unused; switching is a one-line change and
+     recomputes from history, because raw results are never altered.
+
+       { mode: "cumulative" }
+       { mode: "bestN",         n: 8 }        // count the 8 best events
+       { mode: "bestPercentage", pct: 0.667 } // count the best two-thirds
+       { mode: "dropWorst",     drop: 2 }     // discard the 2 worst events
+     ------------------------------------------------------------------------ */
+  seasonScoring: {
+    mode: "cumulative"
+  },
+
   points: {
     perPlaceMultiplier: 300,
-    describe: "Points = (players remaining when you bust) × 300. Win a 20-handed field, take 6,000."
+    describe: "Points = (players outlasted + 1) × 300. Win a 20-handed field, take 6,000."
   },
 
   /* --------------------------------------------------------------------------
@@ -285,12 +309,43 @@ const BPL = {
    * number below is computed from actual recorded games, which is why nobody
    * hand-edits this file after a tournament any more.
    */
+  /**
+   * Apply the season scoring policy to one player's list of event results.
+   * Returns the season points total. NEVER mutates the raw results.
+   */
+  applySeasonPolicy(eventPoints) {
+    const pol = LEAGUE.seasonScoring || { mode: "cumulative" };
+    const pts = eventPoints.slice().sort((a, b) => b - a);   // best first
+    const sum = arr => arr.reduce((a, b) => a + b, 0);
+
+    switch (pol.mode) {
+      case "bestN":
+        return sum(pts.slice(0, Math.max(0, pol.n || pts.length)));
+      case "bestPercentage": {
+        const keep = Math.max(1, Math.ceil(pts.length * (pol.pct || 1)));
+        return sum(pts.slice(0, keep));
+      }
+      case "dropWorst":
+        return sum(pts.slice(0, Math.max(0, pts.length - (pol.drop || 0))));
+      case "cumulative":
+      default:
+        return sum(pts);
+    }
+  },
+
+  /**
+   * Season standings, derived from finalized game results in Firebase.
+   *
+   * The raw event record is the source of truth and is never rewritten. This
+   * only READS it, so changing the season policy later recomputes the whole
+   * table from history without touching a single stored result.
+   */
   aggregate(results) {
     const byName = {};
     LEAGUE.standings.forEach(p => {
       byName[p.name] = Object.assign({}, p, {
         events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0,
-        winnings: 0, rebuys: 0, _places: []
+        winnings: 0, rebuys: 0, _places: [], _eventPoints: [], _rawPoints: 0
       });
     });
 
@@ -301,14 +356,15 @@ const BPL = {
     games.forEach(g => {
       g.finish.forEach(r => {
         if (!byName[r.name]) {
-          /* Someone played who isn't on the roster in data.js — still counts. */
+          /* Played but not on the roster in data.js — still counts. */
           byName[r.name] = { name: r.name, fullName: r.name, avatar: "", saying: "",
             events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0,
-            winnings: 0, rebuys: 0, _places: [] };
+            winnings: 0, rebuys: 0, _places: [], _eventPoints: [], _rawPoints: 0 };
         }
         const p = byName[r.name];
         p.events += 1;
-        p.points += r.points || 0;
+        p._rawPoints += r.points || 0;
+        p._eventPoints.push(r.points || 0);
         p.winnings += r.winnings || 0;
         p.rebuys += r.rebuys || 0;
         if (r.place === 1) p.wins += 1;
@@ -321,10 +377,44 @@ const BPL = {
       const p = byName[n];
       p.avgPlace = p._places.length
         ? p._places.reduce((a, b) => a + b, 0) / p._places.length : 0;
-      delete p._places;
+      p.rawPoints = p._rawPoints;                       // every event, always
+      p.points = BPL.applySeasonPolicy(p._eventPoints); // season policy applied
+      p.eventsCounted = (LEAGUE.seasonScoring || {}).mode === "cumulative"
+        ? p.events : Math.min(p.events, p._eventPoints.length);
+      delete p._places; delete p._eventPoints; delete p._rawPoints;
     });
 
     return { players: Object.keys(byName).map(n => byName[n]), gamesPlayed: games.length, games: games };
+  },
+
+  /**
+   * Rank players for display, with honest ties.
+   *
+   * Order: points -> wins -> cashes -> better average finish. Those are real
+   * competitive comparisons. If two players are still level after all of them
+   * they are genuinely tied and BOTH get the same rank number — name order is
+   * only a stable sort so the list does not jump around between renders, and
+   * is never presented as though it decided anything.
+   */
+  rankPlayers(players) {
+    const cmp = (a, b) =>
+      (b.points - a.points) ||
+      (b.wins - a.wins) ||
+      (b.cashes - a.cashes) ||
+      ((a.avgPlace || 999) - (b.avgPlace || 999)) ||
+      a.name.localeCompare(b.name);          // stable display only
+
+    const tied = (a, b) =>
+      a.points === b.points && a.wins === b.wins &&
+      a.cashes === b.cashes && (a.avgPlace || 999) === (b.avgPlace || 999);
+
+    const sorted = players.slice().sort(cmp);
+    let rank = 0;
+    return sorted.map((p, i) => {
+      if (i === 0 || !tied(p, sorted[i - 1])) rank = i + 1;
+      return Object.assign({}, p, { rank: rank, tied: (i > 0 && tied(p, sorted[i - 1])) ||
+        (i < sorted.length - 1 && tied(p, sorted[i + 1])) });
+    });
   },
 
   /** Standings sorted by points desc, then wins, then fewer events. */
@@ -343,8 +433,62 @@ const BPL = {
     return LEAGUE.announcements.find(a => a.active) || null;
   },
 
+  /**
+   * Which event is "now"? Derived from the schedule, never hand-entered.
+   *
+   * THIS IS THE FIX FOR THE STALE-SITE PROBLEM. Previously the active game
+   * came from a date typed into nextGame.date. If nobody remembered to roll
+   * it forward after a game, the app kept reading LAST game's RSVP node —
+   * which looks exactly like "the site went stale". Now the date comes from
+   * the schedule, so it advances on its own.
+   *
+   * An event stays current through its own calendar day (a game at 8:30pm
+   * shouldn't flip to the next event at 00:01 that morning), then rolls over
+   * at midnight.
+   */
+  currentGame() {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const upcoming = LEAGUE.schedule.filter(e => {
+      if (!e || !e.date) return false;
+      const [y, m, d] = e.date.split("-").map(Number);
+      return new Date(y, m - 1, d) >= todayStart;
+    });
+    if (upcoming.length) return upcoming[0];
+    return LEAGUE.schedule.length ? LEAGUE.schedule[LEAGUE.schedule.length - 1] : null;
+  },
+
+  /** True when every scheduled date has passed — nothing left to RSVP to. */
+  seasonOver() {
+    const g = BPL.currentGame();
+    if (!g) return true;
+    const [y, m, d] = g.date.split("-").map(Number);
+    const todayStart = new Date();
+    return new Date(y, m - 1, d) < new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate());
+  },
+
   /** Total seconds in the configured blind structure. */
   totalMinutes() {
     return LEAGUE.blinds.reduce((s, l) => s + l.mins, 0);
   }
 };
+
+/* ============================================================================
+   AUTO-ROLL THE ACTIVE GAME
+   ----------------------------------------------------------------------------
+   Everything downstream (RSVP node, seat draw, live game state) keys off
+   LEAGUE.nextGame.date. Rather than trusting a human to edit that after every
+   game, derive it from the schedule at load time.
+
+   Add your dates to `schedule` once and the app rolls itself forever.
+
+   Escape hatch: set nextGame.pinDate = true to freeze it on a specific date
+   (useful if you ever need to reopen a past game's RSVPs).
+   ========================================================================== */
+(function autoRollActiveGame() {
+  if (LEAGUE.nextGame.pinDate) return;
+  const g = BPL.currentGame();
+  if (!g) return;
+  LEAGUE.nextGame.date  = g.date;
+  LEAGUE.nextGame.label = g.label + (g.note ? " — " + g.note : "");
+})();

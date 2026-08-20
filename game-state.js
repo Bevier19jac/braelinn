@@ -293,15 +293,24 @@
     },
 
     /* ---------------------------------------------------- host: rebuys  */
+    /**
+     * Rebuy / add-on. Both cost the same, so both increment this counter.
+     *
+     * A rebuy brings a busted player back in, which means clearing bustAt as
+     * well as flipping status — otherwise the old bust timestamp lingers and
+     * would order them wrongly if they bust again later.
+     * (Previously this also wrote a `place` field that no longer exists.)
+     */
     addRebuy(name) {
       const p = S.players[name];
       if (!p) return Promise.resolve();
+      const wasOut = p.status === "out";
       return DB.save("rebuy for " + name,
         () => DB.update(BASE + "/players/" + name, {
           rebuys: (p.rebuys || 0) + 1,
-          status: "active",     // a rebuy puts them back in
-          place: null
-        }));
+          status: "active",
+          bustAt: null          // back in the game — no finishing place yet
+        })).then(() => wasOut);
     },
 
     removeRebuy(name) {
@@ -428,6 +437,9 @@
         date: GAME_ID,
         season: LEAGUE.season,
         label: ev.label || LEAGUE.nextGame.label || "Game",
+        /* Stored so a future season-scoring policy can distinguish a regular
+           event from the season final. NOT used to change scoring today. */
+        type: ev.type || "regular",
         field: field,
         buyinAmount: LEAGUE.nextGame.buyin,
         rebuyAmount: LEAGUE.nextGame.rebuy || LEAGUE.nextGame.buyin,

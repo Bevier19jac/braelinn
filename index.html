@@ -343,12 +343,10 @@
       return;
     }
 
-    const top = agg.players.filter(p => p.events)
-      .sort((a, b) => b.points - a.points || b.wins - a.wins || a.name.localeCompare(b.name))
-      .slice(0, 5);
+    const top = BPL.rankPlayers(agg.players.filter(p => p.events)).slice(0, 5);
 
-    box.innerHTML = top.map((p, i) =>
-      '<div class="stand-row"><span class="rk">' + (i + 1) + '</span>' + UI.avatar(p) +
+    box.innerHTML = top.map((p) =>
+      '<div class="stand-row"><span class="rk">' + (p.tied ? "T" + p.rank : p.rank) + '</span>' + UI.avatar(p) +
       '<span class="nm">' + UI.esc(p.name) + '<small>' + p.events + ' games · ' + p.wins + ' wins</small></span>' +
       '<span class="pts">' + BPL.chips(p.points) + '</span></div>').join("");
   }
