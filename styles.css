@@ -907,3 +907,8 @@ html, body { overflow-x: hidden; }
 
 /* A dash rather than a shimmer once we've given up waiting for Firebase. */
 [data-offline="true"] .stat .n { color: var(--ink-dim); }
+
+/* [hidden] sets display:none, but a later display:flex rule wins on
+   specificity — so elements toggled via .hidden need this explicitly. */
+.livecard[hidden] { display: none !important; }
+.btn[hidden]      { display: none !important; }
