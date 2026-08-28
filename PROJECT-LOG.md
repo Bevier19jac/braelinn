@@ -1,7 +1,7 @@
 # Braelinn Poker League — Project Log
 
 **Live:** https://bevier19jac.github.io/braelinn/
-**Last updated:** 2026-08-20
+**Last updated:** 2026-08-27
 
 A running record of what this app is, what's been decided, what's still open,
 and why things are built the way they are. Written so that a cold reader — or a
@@ -109,6 +109,37 @@ standings now ignore anything that isn't a real finalized tournament.
 ---
 
 ## 9. Work log
+
+### 2026-08-27 — At The Table (live seats, photos, chip counts)
+
+Asked for: the WSOP circuit-app experience — see who's at your table, set your
+own avatar, update your chip stack during play.
+
+**Decisions taken** (Jacob, 27 Aug):
+- A player edits **only their own** count; the host can correct anyone.
+- Everyone sees **all stacks, in chips and big blinds**.
+- Players are prompted **at breaks only** — never mid-hand.
+
+**The honest part.** These counts are hearsay. The WSOP app has tournament
+staff entering numbers; a home game has eight people who will forget. So every
+count is shown with who reported it and how long ago, anything untouched for 30
+minutes greys out, and **nothing in the app reads them back** — places, payouts
+and standings still come from buy-ins, rebuys and bust order. There is a test
+that asserts changing a stack cannot move the pot, the finish order, or the
+field size.
+
+**Reconciliation.** The app knows exactly how many chips *should* be in play:
+buy-ins × 7,000 + rebuys × 6,000 + on-time bonuses × 500. Once every active
+player has reported, it compares that to the reported total and says plainly
+when the numbers have gone fictional. Deliberately silent until everyone has
+reported — a partial total tells you nothing.
+
+Also replaced the old Seats chart rather than adding below it. Two charts of the
+same eight names on one page is the duplication that made the home page
+unreadable.
+
+**Requires a Firebase rules publish** — `stack`, `stackAt` and `stackBy` are new
+keys under each player, and the rules reject unknown keys by design.
 
 ### 2026-08-20 — Visual pass + two real bugs
 
