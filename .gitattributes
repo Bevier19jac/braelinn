@@ -4,3 +4,6 @@
 * text=auto eol=lf
 *.png binary
 *.ico binary
+
+# Batch files must keep CRLF or Windows can mis-parse them.
+*.bat text eol=crlf
