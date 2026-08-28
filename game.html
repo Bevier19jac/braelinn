@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 
@@ -124,6 +124,21 @@
         <span aria-hidden="true">♠</span> Where do I sit?
       </button>
       <div id="seatOut"></div>
+    </section>
+
+    <!-- ================================================= AT THE TABLE -->
+    <section id="tableSec" hidden>
+      <div class="sec-head">
+        <h2>At The Table</h2>
+      </div>
+      <p class="meline" id="meHint"></p>
+      <div class="stackbar" id="stackBar"></div>
+      <div id="tableOut"></div>
+      <p class="tiny muted mt" style="margin-bottom:0">
+        Chip counts are whatever players last typed in — not a running total.
+        Nothing in the app uses them: places, payouts and standings are all
+        worked out from buy-ins, rebuys and who busted when.
+      </p>
     </section>
   </div>
 
@@ -247,11 +262,11 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=3"></script>
-<script src="data.js?v=3"></script>
-<script src="app-core.js?v=3"></script>
-<script src="fx.js?v=3"></script>
-<script src="game-state.js?v=3"></script>
+<script src="firebase-config.js?v=4"></script>
+<script src="data.js?v=4"></script>
+<script src="app-core.js?v=4"></script>
+<script src="fx.js?v=4"></script>
+<script src="game-state.js?v=4"></script>
 <script>
 (function () {
   "use strict";
@@ -356,6 +371,9 @@
     document.title = (c.running ? mm + ":" + ss + " · " : "") + "Braelinn Poker League";
   }
   setInterval(renderClock, 250);
+  /* Break prompt is checked on the clock tick but fires at most once per
+     break, and never while a level is actually running. */
+  setInterval(() => { try { maybePromptStack(); } catch (e) { /* never break the clock */ } }, 5000);
 
   /* ================================================================ ME  */
   function me() { return localStorage.getItem(ME_KEY) || ""; }
@@ -582,21 +600,203 @@
       box.innerHTML = '<div class="card"><p class="seat-empty">No draw yet.</p></div>';
       return;
     }
-    const tables = UI.tables(s.order, s.tables);
-    box.innerHTML = '<div class="seat-tables ' + (tables.length > 1 ? "multi" : "") + '">' +
-      tables.map((t, ti) =>
-        '<div class="seat-table" data-t="' + (ti % 4) + '"><h3>Table ' + (ti + 1) + '</h3>' +
-        t.map((n, si) => {
-          const p = S.players[n];
-          const dead = p && p.status === "out";
-          return '<div class="seat' + (dead ? " dead" : "") + '"><span class="num">' + (si + 1) + '</span>' +
-            UI.avatar(n, "sm") + '<span class="nm">' + UI.esc(n) + '</span></div>';
-        }).join("") + '</div>').join("") + '</div>';
+    /* The seat chart itself is drawn by renderTable() below, which shows the
+       same seats plus photos and chip counts. Drawing it twice on one page is
+       exactly the duplication that made the home page unreadable. */
+    box.innerHTML = "";
   }
 
   document.getElementById("btnWhereSit").addEventListener("click", () => {
     UI.seatLookup(Game.state().seats, me() || null);
   });
+
+  /* ========================================================= AT THE TABLE */
+  /**
+   * The seated table, with each player's photo and last-reported stack.
+   *
+   * Chip counts here are hearsay by design: a player types what they have,
+   * and it is shown with their name and how stale it is. The app never reads
+   * these numbers back for anything that matters. If it did, one person
+   * forgetting to update after a big pot would quietly corrupt the results.
+   */
+  function fmtAge(mins) {
+    if (mins === null || mins === undefined) return "";
+    if (mins < 1) return "just now";
+    if (mins < 60) return mins + "m ago";
+    const h = Math.floor(mins / 60);
+    return h + "h ago";
+  }
+
+  function renderTable() {
+    const S   = Game.state();
+    const sec = document.getElementById("tableSec");
+    const s   = S.seats;
+    /* A drawn seat chart is what makes the table real. Don't gate on game
+       status -- the seats often go up before the host flips the clock on. */
+    const seated = s && Array.isArray(s.order) && s.order.length;
+    sec.hidden = !seated;
+    if (sec.hidden) return;
+
+    const who   = me();
+    const host  = Admin.isUnlocked();
+    const bb    = Game.currentBB();
+    const avg   = Game.avgStack();
+    const drift = Game.stackDrift();
+    const act   = Game.active().length;
+
+    document.getElementById("meHint").innerHTML = who
+      ? 'You are <b>' + UI.esc(who) + '</b> · <button class="sec-toggle" id="btnNotMe" type="button" style="text-decoration:underline">not you?</button>'
+      : '<button class="sec-toggle" id="btnIamMe" type="button" style="text-decoration:underline">Tap to say who you are</button>';
+
+    /* Summary strip: average stack, and an honest note on the totals. */
+    const bits = [];
+    if (avg) bits.push('<span><b>' + BPL.chips(avg) + '</b> avg' +
+      (bb ? ' · ' + (avg / bb).toFixed(0) + ' BB' : '') + '</span>');
+    bits.push('<span><b>' + Game.reportedCount() + '/' + act + '</b> reported</span>');
+    if (drift && Math.abs(drift.pct) > 0.02) {
+      bits.push('<span class="drift">Reported total is ' +
+        (drift.diff > 0 ? 'over' : 'under') + ' by ' + BPL.chips(Math.abs(drift.diff)) +
+        ' — someone\'s count is off</span>');
+    }
+    document.getElementById("stackBar").innerHTML = bits.join("");
+
+    const tables = UI.tables(s.order, s.tables);
+    document.getElementById("tableOut").innerHTML =
+      '<div class="seat-tables ' + (tables.length > 1 ? "multi" : "") + '">' +
+      tables.map((t, ti) =>
+        '<div class="seat-table livetbl" data-t="' + (ti % 4) + '"><h3>Table ' + (ti + 1) + '</h3>' +
+        t.map((n, si) => {
+          const p    = S.players[n] || {};
+          const dead = p.status === "out";
+          const mine = who === n;
+          const editable = mine || host;
+          const stack = p.stack || 0;
+          const age   = Game.stackAgeMins(n);
+          const stale = age !== null && age >= 30;
+
+          let right;
+          if (dead) {
+            right = '<span class="st-out">Out</span>';
+          } else if (stack > 0) {
+            right = '<span class="st-n">' + BPL.chips(stack) + '</span>' +
+                    (bb ? '<span class="st-bb">' + (stack / bb).toFixed(stack / bb < 10 ? 1 : 0) + ' BB</span>' : '') +
+                    '<span class="st-age' + (stale ? ' stale' : '') + '">' +
+                      UI.esc((p.stackBy && p.stackBy !== n ? p.stackBy + ' · ' : '') + fmtAge(age)) +
+                    '</span>';
+          } else {
+            right = '<span class="st-none">' + (editable ? 'Add your count' : 'No count') + '</span>';
+          }
+
+          return '<div class="seat liverow' + (dead ? " dead" : "") + (mine ? " mine" : "") + '"' +
+            (editable && !dead ? ' data-stack="' + UI.esc(n) + '" role="button" tabindex="0"' : '') + '>' +
+            '<span class="num">' + (si + 1) + '</span>' +
+            UI.avatar(n, "sm") +
+            '<span class="nm">' + UI.esc(n) +
+              (p.rebuys ? '<small>+' + p.rebuys + 'r</small>' : '') + '</span>' +
+            '<span class="stk">' + right + '</span></div>';
+        }).join("") + '</div>').join("") + '</div>';
+  }
+
+  /* Delegated so it survives every re-render. */
+  document.getElementById("tableOut").addEventListener("click", e => {
+    const row = e.target.closest("[data-stack]");
+    if (row) openStackSheet(row.dataset.stack);
+  });
+  document.getElementById("meHint").addEventListener("click", e => {
+    if (e.target.id === "btnIamMe") pickMe();
+    if (e.target.id === "btnNotMe") { localStorage.removeItem(ME_KEY); render(); }
+  });
+
+  /**
+   * One sheet for "this is my stack" and "this is my photo". Deliberately
+   * the same sheet: both are things a player owns about themselves.
+   */
+  function openStackSheet(name) {
+    const S = Game.state();
+    const p = S.players[name] || {};
+    const mine = me() === name;
+    const bb = Game.currentBB();
+
+    const wrap = document.createElement("div");
+    wrap.className = "sheet-wrap";
+    wrap.innerHTML =
+      '<div class="sheet stacksheet">' +
+        '<h3>' + UI.esc(name) + (mine ? '' : ' <small>(host edit)</small>') + '</h3>' +
+        '<div class="ss-av">' + UI.avatar(name, "lg") +
+          '<button class="btn btn-sm btn-ghost" data-photo type="button">' +
+            (Photos.has(name) ? "Change photo" : "Add a photo") + '</button>' +
+        '</div>' +
+        '<label class="tiny muted" for="ssChips">Chip count</label>' +
+        '<input class="inp" id="ssChips" type="number" inputmode="numeric" min="0" step="25" ' +
+          'value="' + (p.stack || "") + '" placeholder="e.g. 14200">' +
+        '<p class="tiny muted" id="ssBB" style="min-height:1.2em;margin:6px 0 0"></p>' +
+        '<div class="ss-quick">' +
+          ['-2000','-500','+500','+2000'].map(d =>
+            '<button class="btn btn-sm" data-d="' + d + '" type="button">' + d + '</button>').join("") +
+        '</div>' +
+        '<button class="btn btn-primary btn-block mt" data-save type="button">Save count</button>' +
+        (Admin.isUnlocked() && p.stack ?
+          '<button class="btn btn-sm btn-block mt" data-clear type="button">Clear this count</button>' : '') +
+        '<button class="btn btn-sm btn-block mt" data-no type="button">Cancel</button>' +
+      '</div>';
+    document.body.appendChild(wrap);
+
+    const inp   = wrap.querySelector("#ssChips");
+    const bbOut = wrap.querySelector("#ssBB");
+    const close = () => wrap.remove();
+
+    const showBB = () => {
+      const v = Number(inp.value);
+      bbOut.textContent = (bb && v > 0)
+        ? (v / bb).toFixed(v / bb < 10 ? 1 : 0) + " big blinds at " + BPL.chips(bb)
+        : "";
+    };
+    inp.addEventListener("input", showBB);
+    showBB();
+
+    wrap.querySelectorAll("[data-d]").forEach(b => b.onclick = () => {
+      inp.value = Math.max(0, (Number(inp.value) || 0) + Number(b.dataset.d));
+      showBB();
+    });
+
+    wrap.querySelector("[data-photo]").onclick = () => Photos.upload(name);
+    wrap.querySelector("[data-no]").onclick = close;
+    wrap.onclick = e => { if (e.target === wrap) close(); };
+
+    const clr = wrap.querySelector("[data-clear]");
+    if (clr) clr.onclick = () => Game.clearStack(name).then(close);
+
+    wrap.querySelector("[data-save]").onclick = () => {
+      const v = Number(inp.value);
+      if (!isFinite(v) || v < 0) return UI.toast("That is not a chip count", "bad");
+      Game.setStack(name, v, me() || name).then(close,
+        err => UI.toast(err.message, "bad"));
+    };
+    setTimeout(() => inp.focus(), 60);
+  }
+
+  /* ---------------------------------------------------------------------
+     BREAK PROMPT — ask once per break, never mid-hand.
+     A break is the only moment everybody is already stood up counting down,
+     so it is the only moment a nudge is not an interruption.
+     ------------------------------------------------------------------- */
+  let promptedBreak = null;
+  function maybePromptStack() {
+    const S = Game.state();
+    if (S.status !== "running") return;
+    const c = Game.clock();
+    if (!c.running || !c.lv || !c.lv.break) { promptedBreak = null; return; }
+    if (promptedBreak === c.index) return;
+    const who = me();
+    if (!who) return;
+    const p = S.players[who];
+    if (!p || p.status !== "active") return;
+    const age = Game.stackAgeMins(who);
+    if (age !== null && age < 15) return;      // already current, leave them alone
+    promptedBreak = c.index;
+    UI.toast("Break — update your chip count", "info");
+    setTimeout(() => openStackSheet(who), 900);
+  }
 
   /* =============================================================== MONEY */
   function renderMoney() {
@@ -822,6 +1022,7 @@
     renderQueue();
     renderPlayers();
     renderSeats();
+    renderTable();
     renderMoney();
     if (Admin.isUnlocked()) renderCheckin();
     renderClock();

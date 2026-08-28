@@ -175,6 +175,115 @@
       return row ? row.place : null;
     },
 
+    /* ------------------------------------------------------------------ *
+     * CHIP COUNTS                                                         *
+     *                                                                     *
+     * These are PLAYER-REPORTED, not observed. Nobody on a poker night is
+     * going to keep them perfectly current, so nothing in this app is ever
+     * allowed to depend on them: not standings, not payouts, not places,
+     * not elimination. They exist to show the table what the table roughly
+     * looks like, and every display of them carries who said it and when.
+     * ------------------------------------------------------------------ */
+
+    /**
+     * How many chips SHOULD be in play, from facts the app actually knows:
+     * every buy-in, every rebuy, every on-time bonus. This is exact.
+     */
+    chipsInPlay() {
+      const ng = LEAGUE.nextGame;
+      return Object.keys(S.players).reduce((sum, n) => {
+        const p = S.players[n];
+        if (p.status !== "active") return sum;           // busted chips left the table
+        return sum + (p.buyins || 1) * (ng.startStack || 7000)
+                   + (p.rebuys || 0) * (ng.rebuyStack || 6000)
+                   + (p.bonus ? (ng.earlyBonus || 0) : 0);
+      }, 0);
+    },
+
+    /** Sum of what players have actually reported (active players only). */
+    reportedChips() {
+      return Game.active().reduce((s, n) => s + (S.players[n].stack || 0), 0);
+    },
+
+    /** How many active players have reported anything at all. */
+    reportedCount() {
+      return Game.active().filter(n => (S.players[n].stack || 0) > 0).length;
+    },
+
+    /**
+     * Honest reconciliation. If everyone has reported and the totals don't
+     * match, the reported numbers are wrong -- chips do not appear or vanish.
+     * Returns null while anyone is still missing, because a partial total
+     * tells you nothing.
+     */
+    stackDrift() {
+      const act = Game.active();
+      if (!act.length || Game.reportedCount() < act.length) return null;
+      const expected = Game.chipsInPlay();
+      const reported = Game.reportedChips();
+      return { expected: expected, reported: reported, diff: reported - expected,
+               pct: expected ? (reported - expected) / expected : 0 };
+    },
+
+    /** Average stack among players still in. */
+    avgStack() {
+      const n = Game.active().length;
+      return n ? Math.round(Game.chipsInPlay() / n) : 0;
+    },
+
+    /**
+     * The big blind that is actually in force right now. On a break the level
+     * has no blinds, so fall back to the next real level -- that is the one
+     * players are about to face and the one they are counting against.
+     */
+    currentBB() {
+      const c = Game.clock();
+      if (c.lv && c.lv.bb) return c.lv.bb;
+      const after = LEAGUE.blinds.slice(c.index + 1).find(l => l && l.bb);
+      if (after) return after.bb;
+      const before = LEAGUE.blinds.slice(0, c.index).reverse().find(l => l && l.bb);
+      return before ? before.bb : 0;
+    },
+
+    /** A stack in big blinds -- the number that actually means something. */
+    bigBlinds(chips) {
+      const bb = Game.currentBB();
+      if (!bb || !chips) return null;
+      return chips / bb;
+    },
+
+    /** Minutes since a player last reported. null if they never have. */
+    stackAgeMins(name) {
+      const p = S.players[name];
+      if (!p || !p.stackAt) return null;
+      return Math.max(0, Math.round((DB.now() - p.stackAt) / 60000));
+    },
+
+    /**
+     * Report a chip count. A player may set their own; the host may correct
+     * anyone. `by` records who said it so the table can see the difference.
+     */
+    setStack(name, chips, by) {
+      const p = S.players[name];
+      if (!p) return Promise.reject(new Error(name + " is not checked in"));
+      const n = Math.round(Number(chips));
+      if (!isFinite(n) || n < 0) return Promise.reject(new Error("That is not a chip count"));
+      if (n > 10000000) return Promise.reject(new Error("That is too many chips"));
+      return DB.save("chip count for " + name,
+        () => DB.update(BASE + "/players/" + name, {
+          stack: n,
+          stackAt: DB.now(),
+          stackBy: String(by || name).slice(0, 40)
+        }));
+    },
+
+    /** Host: wipe a bogus number rather than guessing a replacement. */
+    clearStack(name) {
+      return DB.save("clear chip count for " + name,
+        () => DB.update(BASE + "/players/" + name,
+          { stack: null, stackAt: null, stackBy: null }));
+    },
+
     pendingReports() {
       return Object.keys(S.reports).map(id => Object.assign({ id: id }, S.reports[id]))
         .sort((a, b) => (a.at || 0) - (b.at || 0));
