@@ -251,8 +251,17 @@
     /* True while the league is still running on the shipped seed PIN. */
     usingDefault: true,
 
+    /* The real PIN lives in Firebase and arrives a beat after the page does.
+       Anything that CHECKS a PIN has to wait for it, or the first person to
+       type the right code on a cold load gets told they're wrong. */
+    pinLoaded: false,
+    _pinSeen: null,
+    ready: null,
+
     watch() {
       DB.on("config/pin", val => {
+        Admin.pinLoaded = true;
+        if (Admin._pinSeen) Admin._pinSeen();
         if (val) Admin.pin = String(val);
         else DB.set("config/pin", Admin.pin);
 
@@ -585,6 +594,23 @@
         };
         setTimeout(() => f.focus(), 50);
       });
+    },
+
+    /** Read-only sheet. Body is trusted HTML the caller has already escaped. */
+    info(title, bodyHtml) {
+      const wrap = document.createElement("div");
+      wrap.className = "sheet-wrap";
+      wrap.innerHTML =
+        '<div class="sheet"><h3>' + UI.esc(title) + '</h3>' +
+        '<div class="sheet-body">' + bodyHtml + '</div>' +
+        '<button class="btn btn-block mt" data-no>Close</button></div>';
+      document.body.appendChild(wrap);
+      const done = () => { wrap.remove(); document.removeEventListener("keydown", esc); };
+      const esc = e => { if (e.key === "Escape") done(); };
+      wrap.querySelector("[data-no]").onclick = done;
+      wrap.onclick = e => { if (e.target === wrap) done(); };
+      document.addEventListener("keydown", esc);
+      return done;
     }
   };
 
@@ -686,6 +712,17 @@
   };
 
   DB.init();
+  /* Resolves when the host PIN has been read from Firebase, or after four
+     seconds offline -- so a PIN check never hangs forever waiting on a
+     network that isn't coming back. */
+  Admin.ready = new Promise(function (resolve) {
+    let done = false;
+    function finish() { if (!done) { done = true; resolve(); } }
+    Admin._pinSeen = finish;
+    if (Admin.pinLoaded) finish();
+    setTimeout(finish, 4000);
+  });
+
   Admin.watch();
   Photos.watch();
 

@@ -113,6 +113,38 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 29 Aug — the app opens on a sign-in screen
+
+Jacob: *"i kind of like the idea of an login page and you just select your name
+... then there isnt a whole list of names ... they will see their options for
+yes no or maybe"* and *"they should be able to click on in for next and be able
+to see a list of who is in"*.
+
+- **`index.html` opens on a full-screen sign-in.** Search box, the whole roster
+  as tappable rows, hosts tagged. One tap and you're in; the phone remembers.
+- **Jacob and Nate get a second step**: their name, then the host passcode.
+  Wrong passcode signs nobody in and says so. "Skip - just playing tonight"
+  signs them in as a plain player; Unlock is still offered later on the card.
+  The check waits on `Admin.ready`, because the real passcode arrives from
+  Firebase a beat after the page does and checking early would have told Nate
+  he typed it wrong.
+- **RSVP is now YOUR card**: avatar, name, three buttons (I'm in / Maybe /
+  I'm out), Clear my answer, and the Master Control button for hosts. One card,
+  not two stacked ones both headed "Nate".
+- **The thirty-four-name list is folded away** behind "Show everyone" - still
+  there, because Jacob and Nate do answer for the guy who texted.
+- **"In For Next" is a button.** Tap it for the head count: who's in, who's a
+  maybe, who's out, with a tick against anyone already checked in.
+- **The Table bounces a stranger** to `index.html?next=game` and drops them back
+  on The Table once they've signed in. One sign-in screen for the whole app.
+- Caught in test, not on game night: `display:grid` beat the `[hidden]`
+  attribute, so the gate stayed invisible-but-clickable over the whole page and
+  swallowed every tap. `.signin[hidden]{display:none}`.
+- `identity-test.js` retired, replaced by `login-test.js` (45 checks). Seven
+  other suites needed an identity seeded before their first `game.html` load -
+  the redirect is doing exactly what it should.
+
+
 ### 2026-08-29 — Bird's-eye table, a real simulator, and housekeeping
 
 **Bird's-eye view.** Tap a table and see it from above: seats orbiting an oval

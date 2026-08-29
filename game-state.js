@@ -335,6 +335,54 @@
         }));
     },
 
+    /**
+     * A player buying their own top-up, from their own seat.
+     *
+     * This counts immediately -- a deliberate league decision. The pot and the
+     * payouts move on the tap, so two things guard it: the one-per-player cap
+     * still applies exactly as it does for the host, and the claim records WHO
+     * made it. Nate can see what was self-reported and take it back with one
+     * tap if somebody was optimistic.
+     */
+    claimRebuy(name) {
+      const p = S.players[name];
+      if (!p) return Promise.reject(new Error("You're not checked in yet — see the host."));
+      if (p.status === "out") {
+        return Promise.reject(new Error("You're out. The host has to put you back in."));
+      }
+      const cap = LEAGUE.nextGame.maxTopUps;
+      if (typeof cap === "number" && (p.rebuys || 0) >= cap) {
+        return Promise.reject(new Error("You've already used your top-up for tonight."));
+      }
+      if (!Game.rebuyWindowOpen()) {
+        return Promise.reject(new Error("The rebuy window closed at the break."));
+      }
+      return DB.save("rebuy for " + name,
+        () => DB.update(BASE + "/players/" + name, {
+          rebuys: (p.rebuys || 0) + 1,
+          rebuyBy: name,                 // self-reported, not host-recorded
+          rebuyAt: DB.now()
+        }));
+    },
+
+    /** Did this rebuy come from the player rather than the host? */
+    selfClaimed(name) {
+      const p = S.players[name];
+      return !!(p && p.rebuyBy === name);
+    },
+
+    /**
+     * Rebuys and add-ons close at the break that is flagged lastRebuy. Before
+     * the clock is started nothing has closed yet.
+     */
+    rebuyWindowOpen() {
+      const c = Game.clock();
+      if (!c.started) return true;
+      const idx = LEAGUE.blinds.findIndex(b => b.lastRebuy);
+      if (idx === -1) return true;
+      return c.index <= idx;
+    },
+
     /** Host: wipe a bogus number rather than guessing a replacement. */
     clearStack(name) {
       return DB.save("clear chip count for " + name,

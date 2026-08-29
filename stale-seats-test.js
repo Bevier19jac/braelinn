@@ -13,8 +13,11 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
  const B='http://localhost:8947/';
 
  console.log('\n== REPRODUCE THE LIVE BUG: seats drawn, NOBODY checked in ==');
+ // /* The Table now bounces anyone not signed in to the sign-in screen, so seed an identity before the first load. */
+ await p.goto(B+'index.html',{waitUntil:'domcontentloaded'});
+ await p.evaluate(()=>{try{localStorage.setItem('bpl_me','Nate')}catch(e){}});
  await p.goto(B+'game.html',{waitUntil:'networkidle'});
- await p.evaluate(async()=>{ try{localStorage.clear();sessionStorage.clear()}catch(e){}
+ await p.evaluate(async()=>{ try{localStorage.clear();sessionStorage.clear();localStorage.setItem('bpl_me','Nate')}catch(e){}
    await Game.resetNight(); await Game.start();
    // exactly what was sitting in the live database
    await DB.set('live/'+LEAGUE.nextGame.date+'/seats',

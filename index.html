@@ -20,7 +20,7 @@
 <meta property="og:title" content="Braelinn Poker League">
 <meta property="og:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
 <meta property="og:url" content="https://bevier19jac.github.io/braelinn/">
-<meta property="og:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+<meta property="og:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=18">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Braelinn Poker League — Season 7, Peachtree City GA">
@@ -28,7 +28,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Braelinn Poker League">
 <meta name="twitter:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
-<meta name="twitter:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+<meta name="twitter:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=18">
 
 <!-- ===================================================================
      INSTALLED-APP BEHAVIOUR
@@ -36,14 +36,14 @@
      that as the home-screen icon. apple-mobile-web-app-title stops iOS
      labelling the icon from <title>.
      =================================================================== -->
-<link rel="manifest" href="manifest.json?v=2">
+<link rel="manifest" href="manifest.json?v=18">
 <meta name="theme-color" content="#06120d">
 <meta name="color-scheme" content="dark">
 
-<link rel="icon" href="favicon.ico?v=2" sizes="any">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=2">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+<link rel="icon" href="favicon.ico?v=18" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=18">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=18">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=18">
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -54,9 +54,41 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=14">
+<link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
+
+<!-- ===================================================== SIGN IN GATE
+     Nobody sees the league until they've said who they are. It costs one
+     tap, and it buys every other screen the right to stop asking: the RSVP
+     shows YOUR three buttons instead of thirty-four rows, and The Table
+     knows whose chip stack it is looking at.
+     ================================================================= -->
+<div class="signin" id="signIn" hidden>
+  <div class="si-card" role="dialog" aria-modal="true" aria-labelledby="siTitle">
+    <div class="si-suits" aria-hidden="true"><span class="b">&spades;</span><span class="r">&hearts;</span><span class="r">&diams;</span><span class="b">&clubs;</span></div>
+    <h1 id="siTitle">Braelinn Poker League</h1>
+    <p class="si-sub" id="siSub">Sign in</p>
+
+    <div id="siPick">
+      <input class="inp si-find" id="siFilter" type="search" autocomplete="off"
+             placeholder="Type your name&hellip;" aria-label="Find your name">
+      <div class="si-list" id="siList" role="listbox"></div>
+      <p class="tiny muted si-foot">Season 7 &middot; Braelinn Village</p>
+    </div>
+
+    <div id="siHost" hidden>
+      <div class="si-you" id="siYou"></div>
+      <label class="tiny muted" for="siPin">Host passcode</label>
+      <input class="inp" id="siPin" type="password" inputmode="numeric"
+             autocomplete="off" placeholder="&bull;&bull;&bull;&bull;">
+      <p class="si-err" id="siErr" hidden></p>
+      <button class="btn btn-primary btn-block mt" id="siGo" type="button">Unlock Master Control</button>
+      <button class="btn btn-sm btn-block btn-ghost mt" id="siSkip" type="button">Skip &mdash; just playing tonight</button>
+      <button class="btn btn-sm btn-block btn-ghost mt" id="siBack" type="button">&larr; Not Nate? Pick another name</button>
+    </div>
+  </div>
+</div>
 
 <div id="nav"></div>
 
@@ -107,7 +139,9 @@
   <section>
     <div class="stat-row" id="statRow" data-loading="true">
       <div class="stat"><span class="n" id="stEvents">&nbsp;</span><span class="l">Games Played</span></div>
-      <div class="stat"><span class="n" id="stIn">&nbsp;</span><span class="l">In For Next</span></div>
+      <button class="stat tappable" id="stInBtn" type="button">
+        <span class="n" id="stIn">&nbsp;</span><span class="l">In For Next <span class="statgo" aria-hidden="true">›</span></span>
+      </button>
       <div class="stat"><span class="n" id="stKitty">&nbsp;</span><span class="l">Projected Pot</span></div>
     </div>
   </section>
@@ -118,15 +152,30 @@
       <h2>Who's In?</h2>
       <span class="hint" id="rsvpFor"></span>
     </div>
+
+    <!-- Who this phone belongs to, and YOUR answer: three buttons, no
+         scrolling past everyone else. One card, because two cards both
+         headed "Nate" is just the same name twice. -->
+    <div class="card mycard" id="myRsvp"></div>
+
     <div class="card">
-      <input class="inp mb" id="rsvpFilter" type="search" placeholder="Find your name…" aria-label="Find your name">
-      <div class="rsvp-list" id="rsvpList"></div>
-      <button class="btn btn-sm btn-block mt" id="btnRsvpAll"></button>
       <div class="rsvp-tally">
         <span><span class="dot in"></span>In <b id="tIn">0</b></span>
         <span><span class="dot maybe"></span>Maybe <b id="tMaybe">0</b></span>
         <span><span class="dot out"></span>Out <b id="tOut">0</b></span>
       </div>
+      <button class="sec-toggle everyone" id="btnEveryone" type="button"
+              aria-expanded="false" aria-controls="everyoneBox">Show everyone</button>
+
+      <!-- The full list is still here for Jacob and Nate, who do answer for
+           the guy who texted instead of tapping. Collapsed, because for the
+           other thirty-odd people it was just a wall of names. -->
+      <div id="everyoneBox" hidden>
+        <input class="inp mb mt" id="rsvpFilter" type="search" placeholder="Find a name…" aria-label="Find a name">
+        <div class="rsvp-list" id="rsvpList"></div>
+        <button class="btn btn-sm btn-block mt" id="btnRsvpAll"></button>
+      </div>
+
       <p class="tiny muted mt" style="margin-bottom:0">
         RSVP isn't the same as playing — everyone gets checked in at the door,
         and the seat draw runs off who actually turned up.
@@ -185,10 +234,10 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=14"></script>
-<script src="data.js?v=14"></script>
-<script src="app-core.js?v=14"></script>
-<script src="fx.js?v=14"></script>
+<script src="firebase-config.js?v=18"></script>
+<script src="data.js?v=18"></script>
+<script src="app-core.js?v=18"></script>
+<script src="fx.js?v=18"></script>
 <script>
 (function () {
   "use strict";
@@ -272,6 +321,143 @@
     document.getElementById("noneMeta").innerHTML =
       bits.map(b => "<span>" + b + "</span>").join("");
   })();
+
+  /* --------------------------------------------------------- WHO AM I
+
+     The app opens on one question and nothing else: your name. Everything
+     downstream depends on the answer -- your RSVP buttons, your seat, your
+     chip stack -- and asking once up front is cheaper than asking on every
+     screen. Jacob and Nate get the passcode step here, so running the night
+     starts the same way playing it does.
+     ------------------------------------------------------------------- */
+  const RSVP_LABEL = { in: "I'm in", maybe: "Maybe", out: "I'm out" };
+  const MY_STATE = {
+    in:    "You're in for this one",
+    maybe: "You're a maybe",
+    out:   "You're sitting this one out"
+  };
+
+  const ME_KEY = "bpl_me";
+  function me() { try { return localStorage.getItem(ME_KEY) || ""; } catch (e) { return ""; } }
+  function setMe(v) { try { localStorage.setItem(ME_KEY, v); } catch (e) { /* private mode */ } }
+  function isHost(n) { return !!(LEAGUE.hosts && LEAGUE.hosts.indexOf(n) !== -1); }
+
+  const gate    = document.getElementById("signIn");
+  const siPick  = document.getElementById("siPick");
+  const siHost  = document.getElementById("siHost");
+  let siChosen  = "";
+
+  function roster() {
+    return LEAGUE.standings.slice().sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function renderSignInList() {
+    const q = (document.getElementById("siFilter").value || "").trim().toLowerCase();
+    const list = roster().filter(p =>
+      !q || p.name.toLowerCase().indexOf(q) !== -1 ||
+      (p.fullName || "").toLowerCase().indexOf(q) !== -1);
+
+    document.getElementById("siList").innerHTML = list.length
+      ? list.map(p =>
+          '<button class="si-row" type="button" data-n="' + UI.esc(p.name) + '">' +
+            UI.avatar(p, "sm") +
+            '<span class="si-nm">' + UI.esc(p.name) +
+              (p.fullName && p.fullName !== p.name
+                ? '<small>' + UI.esc(p.fullName) + '</small>' : "") +
+            '</span>' +
+            (isHost(p.name) ? '<span class="si-tag">Host</span>' : '') +
+          '</button>').join("")
+      : '<p class="empty">No one by that name. Ask Jacob or Nate to add you.</p>';
+  }
+
+  function openGate() {
+    siChosen = "";
+    siHost.hidden = true;
+    siPick.hidden = false;
+    document.getElementById("siSub").textContent = "Sign in";
+    document.getElementById("siFilter").value = "";
+    document.getElementById("siPin").value = "";
+    document.getElementById("siErr").hidden = true;
+    renderSignInList();
+    gate.hidden = false;
+    document.body.classList.add("gated");
+  }
+
+  function closeGate() {
+    gate.hidden = true;
+    document.body.classList.remove("gated");
+  }
+
+  /* Signing in is what every other render on this page is waiting for. */
+  function signedIn(name) {
+    setMe(name);
+    closeGate();
+    /* Came here from The Table because they weren't signed in -- put them
+       back where they were headed. */
+    if (/[?&]next=game\b/.test(location.search)) { location.replace("game.html"); return; }
+    renderWho();
+    if (typeof renderMyRsvp === "function") renderMyRsvp();
+    if (typeof renderRsvp === "function") renderRsvp();
+    if (typeof renderSeats === "function") renderSeats();
+  }
+
+  document.getElementById("siFilter").addEventListener("input", renderSignInList);
+
+  document.getElementById("siList").addEventListener("click", e => {
+    const row = e.target.closest(".si-row");
+    if (!row) return;
+    const name = row.dataset.n;
+    if (!isHost(name)) { signedIn(name); return; }
+
+    /* Host: same sign-in, one more step. */
+    siChosen = name;
+    siPick.hidden = true;
+    siHost.hidden = false;
+    document.getElementById("siSub").textContent = "Host sign in";
+    document.getElementById("siYou").innerHTML =
+      UI.avatar(name, "sm") + '<span><b>' + UI.esc(name) + '</b><small>Host</small></span>';
+    document.getElementById("siBack").innerHTML = "\u2190 Not " + UI.esc(name) + "? Pick another name";
+    setTimeout(() => document.getElementById("siPin").focus(), 60);
+  });
+
+  function tryHostPin() {
+    const btn = document.getElementById("siGo");
+    const err = document.getElementById("siErr");
+    const entered = document.getElementById("siPin").value;
+    if (!entered) { err.textContent = "Enter the passcode, or skip."; err.hidden = false; return; }
+
+    /* The real passcode arrives from Firebase a beat after the page does.
+       Checking before it lands would tell Nate he typed it wrong. */
+    btn.disabled = true;
+    btn.textContent = "Checking…";
+    Admin.ready.then(() => {
+      btn.disabled = false;
+      btn.textContent = "Unlock Master Control";
+      if (Admin.unlock(entered)) { signedIn(siChosen); UI.toast("Master Control unlocked", "ok"); }
+      else {
+        err.textContent = Admin.pinLoaded
+          ? "That's not the passcode."
+          : "Can't reach the league right now — try again when you're back online.";
+        err.hidden = false;
+        document.getElementById("siPin").select();
+      }
+    });
+  }
+
+  document.getElementById("siGo").addEventListener("click", tryHostPin);
+  document.getElementById("siPin").addEventListener("keydown", e => {
+    if (e.key === "Enter") tryHostPin();
+  });
+  document.getElementById("siSkip").addEventListener("click", () => signedIn(siChosen));
+  document.getElementById("siBack").addEventListener("click", openGate);
+
+  /* renderWho lives inside renderMyRsvp now -- your name and your three
+     buttons are one thing, not two stacked cards saying "Nate". */
+  function renderWho() { if (typeof renderMyRsvp === "function") renderMyRsvp(); }
+
+  window.addEventListener("bpl:adminchange", renderWho);
+  renderWho();
+  if (!me()) openGate();
 
   /* ---------------------------------------------------------------- HERO */
   document.getElementById("heroEyebrow").textContent = "Season " + LEAGUE.season;
@@ -458,14 +644,124 @@
       '<span class="pts">' + BPL.chips(p.points) + '</span></div>').join("");
   }
 
-  /* ---------------------------------------------------------------- RSVP */
+  /* ---------------------------------------------------------------- RSVP
+
+     The old page put thirty-four rows in front of you and asked you to find
+     yourself. Now you are already signed in, so the page asks YOU one
+     question with three buttons. The full list still exists -- Jacob and
+     Nate answer for the guy who texted -- but it is folded away, and the
+     head count is a tap on "In For Next" rather than a wall of names.
+     ------------------------------------------------------------------- */
   document.getElementById("rsvpFor").textContent = BPL.fmtDate(NG.date, { month: "short", day: "numeric" });
 
   let showAllRsvp = false;
+  let showEveryone = false;
 
+
+  function renderMyRsvp() {
+    const box = document.getElementById("myRsvp");
+    const who = me();
+
+    if (!who) {
+      box.innerHTML =
+        '<div class="my-head"><span class="my-t"><b>Not signed in</b>' +
+        '<small>Say who you are and your buttons appear here</small></span>' +
+        '<button class="btn btn-sm btn-primary" id="btnSignIn" type="button">Sign in</button></div>';
+      return;
+    }
+
+    const v = rsvpState[who] || "";
+    const checked = !!livePlayers[who];
+    const unlocked = Admin.isUnlocked();
+
+    box.innerHTML =
+      '<div class="my-head">' + UI.avatar(who, "md") +
+        '<span class="my-t"><b>' + UI.esc(who) + '</b>' +
+          '<small>' + (checked
+            ? "✓ Checked in at the door"
+            : (v ? MY_STATE[v] : "You haven't answered yet")) +
+          '</small></span>' +
+        '<button class="btn btn-sm" id="btnNotMe" type="button">Not me</button>' +
+      '</div>' +
+      '<div class="my-chips" data-p="' + UI.esc(who) + '">' +
+        ["in", "maybe", "out"].map(k =>
+          '<button class="mychip ' + k + (v === k ? " on" : "") + '" type="button" data-v="' + k + '">' +
+            RSVP_LABEL[k] + '</button>').join("") +
+      '</div>' +
+      (v ? '<button class="btn btn-sm btn-block mt" id="btnClearMine" type="button">Clear my answer</button>' : '') +
+      (isHost(who)
+        ? '<div class="wb-host">' +
+            (unlocked
+              ? '<a class="btn btn-sm btn-primary" href="game.html">⚙ Master Control →</a>' +
+                '<button class="btn btn-sm" id="btnLockHere" type="button">Lock</button>'
+              : '<button class="btn btn-sm btn-primary" id="btnUnlockHere" type="button">⚙ Unlock Master Control</button>') +
+          '</div>'
+        : '');
+  }
+
+  document.getElementById("myRsvp").addEventListener("click", e => {
+    if (e.target.id === "btnSignIn") { openGate(); return; }
+    if (e.target.id === "btnNotMe") {
+      try { localStorage.removeItem(ME_KEY); } catch (err) {}
+      Admin.lock(); renderMyRsvp(); openGate(); return;
+    }
+    if (e.target.id === "btnUnlockHere") { if (Admin.require()) renderMyRsvp(); return; }
+    if (e.target.id === "btnLockHere") { Admin.lock(); renderMyRsvp(); UI.toast("Locked"); return; }
+
+    const who = me();
+    if (!who) return;
+    if (e.target.id === "btnClearMine") {
+      DB.save("Your RSVP", () => DB.set(RSVP + "/" + who, null));
+      return;
+    }
+    const btn = e.target.closest(".mychip");
+    if (!btn) return;
+    const val = btn.dataset.v;
+    const next = rsvpState[who] === val ? null : val;
+    DB.save("Your RSVP", () => DB.set(RSVP + "/" + who, next));
+  });
+
+  /* ------------------------------------------------------- WHO'S COMING */
+  function rsvpGroup(kind) {
+    return LEAGUE.standings.map(p => p.name)
+      .filter(n => rsvpState[n] === kind)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  function whosIn() {
+    const who = me();
+    const groups = [
+      ["in", "In", "No one has said they're in yet."],
+      ["maybe", "Maybe", ""],
+      ["out", "Out", ""]
+    ];
+    let html = "";
+    groups.forEach(([kind, label, emptyMsg]) => {
+      const names = rsvpGroup(kind);
+      if (!names.length) {
+        if (emptyMsg) html += '<p class="empty">' + emptyMsg + '</p>';
+        return;
+      }
+      html += '<div class="wi-head"><span class="dot ' + kind + '"></span>' + label +
+              ' <b>' + names.length + '</b></div>' +
+              '<div class="wi-list">' + names.map(n =>
+                '<div class="wi-row' + (n === who ? " isme" : "") + '">' +
+                  UI.avatar(n, "sm") + '<span>' + UI.esc(n) +
+                  (n === who ? ' <em>you</em>' : '') + '</span>' +
+                  (livePlayers[n] ? '<span class="wi-ok">✓ here</span>' : '') +
+                '</div>').join("") + '</div>';
+    });
+    if (!html) html = '<p class="empty">Nobody has answered yet.</p>';
+    UI.info("Who's coming · " + BPL.fmtShort(NG.date), html);
+  }
+
+  document.getElementById("stInBtn").addEventListener("click", whosIn);
+
+  /* ---------------------------------------------------- THE WHOLE LIST */
   function renderRsvp() {
-    const q = (document.getElementById("rsvpFilter").value || "").toLowerCase();
     const box = document.getElementById("rsvpList");
+    const filterEl = document.getElementById("rsvpFilter");
+    const q = (filterEl.value || "").toLowerCase();
 
     const list = LEAGUE.standings.filter(p => {
       if (q) return p.name.toLowerCase().includes(q) || (p.fullName || "").toLowerCase().includes(q);
@@ -480,7 +776,7 @@
     box.innerHTML = list.map(p => {
       const v = rsvpState[p.name] || "";
       const checked = !!livePlayers[p.name];
-      return '<div class="rsvp-row">' + UI.avatar(p) +
+      return '<div class="rsvp-row' + (p.name === me() ? " isme" : "") + '">' + UI.avatar(p) +
         '<span class="nm">' + UI.esc(p.name) +
           (checked ? '<small class="ok">✓ checked in</small>' : "") + '</span>' +
         '<span class="chips" data-p="' + UI.esc(p.name) + '">' +
@@ -501,6 +797,8 @@
     document.getElementById("tOut").textContent = o;
     document.getElementById("stIn").textContent = i;
     document.getElementById("stKitty").textContent = BPL.money(i * NG.buyin);
+
+    renderMyRsvp();
   }
 
   document.getElementById("rsvpList").addEventListener("click", e => {
@@ -515,6 +813,15 @@
   document.getElementById("rsvpFilter").addEventListener("input", renderRsvp);
   document.getElementById("btnRsvpAll").addEventListener("click", () => {
     showAllRsvp = !showAllRsvp; renderRsvp();
+  });
+
+  document.getElementById("btnEveryone").addEventListener("click", () => {
+    showEveryone = !showEveryone;
+    document.getElementById("everyoneBox").hidden = !showEveryone;
+    const b = document.getElementById("btnEveryone");
+    b.textContent = showEveryone ? "Hide the list" : "Show everyone";
+    b.setAttribute("aria-expanded", showEveryone ? "true" : "false");
+    if (showEveryone) renderRsvp();
   });
 
   /* ----------------------------------------------------------- SEAT DRAW */

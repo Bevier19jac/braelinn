@@ -11,8 +11,11 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
  await c.route('**/gstatic.com/**',r=>r.abort());
  const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
  const B='http://localhost:8945/';
+ // /* The Table now bounces anyone not signed in to the sign-in screen, so seed an identity before the first load. */
+ await p.goto(B+'index.html',{waitUntil:'domcontentloaded'});
+ await p.evaluate(()=>{try{localStorage.setItem('bpl_me','Nate')}catch(e){}});
  await p.goto(B+'game.html',{waitUntil:'networkidle'});
- await p.evaluate(async()=>{try{localStorage.clear();sessionStorage.clear()}catch(e){}; await Game.resetNight?.();});
+ await p.evaluate(async()=>{try{localStorage.clear();sessionStorage.clear();localStorage.setItem('bpl_me','Nate')}catch(e){}; await Game.resetNight?.();});
  await p.goto(B+'game.html',{waitUntil:'networkidle'}); await p.waitForTimeout(800);
 
  console.log('\n== BEFORE ANY SEAT DRAW: NO NAMES ANYWHERE ==');

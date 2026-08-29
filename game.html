@@ -20,7 +20,7 @@
 <meta property="og:title" content="Braelinn Poker League">
 <meta property="og:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
 <meta property="og:url" content="https://bevier19jac.github.io/braelinn/">
-<meta property="og:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+<meta property="og:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=18">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Braelinn Poker League — Season 7, Peachtree City GA">
@@ -28,7 +28,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Braelinn Poker League">
 <meta name="twitter:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
-<meta name="twitter:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+<meta name="twitter:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=18">
 
 <!-- ===================================================================
      INSTALLED-APP BEHAVIOUR
@@ -36,14 +36,14 @@
      that as the home-screen icon. apple-mobile-web-app-title stops iOS
      labelling the icon from <title>.
      =================================================================== -->
-<link rel="manifest" href="manifest.json?v=2">
+<link rel="manifest" href="manifest.json?v=18">
 <meta name="theme-color" content="#06120d">
 <meta name="color-scheme" content="dark">
 
-<link rel="icon" href="favicon.ico?v=2" sizes="any">
-<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
-<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=2">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+<link rel="icon" href="favicon.ico?v=18" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=18">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=18">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=18">
 
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=14">
+<link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
 
@@ -66,11 +66,24 @@
   <!-- One question, once per phone. Everything else waits behind it. -->
   <section id="whoSec" hidden>
     <div class="card whocard">
-      <h1 class="who-h">Who are you?</h1>
-      <p class="who-sub">Pick your name. This phone will remember.</p>
-      <select class="inp who-select" id="whoSelect" aria-label="Choose your name">
+      <h1 class="who-h">Sign in first</h1>
+      <p class="who-sub">The table needs to know whose seat and whose chips it's looking at.</p>
+      <a class="btn btn-primary btn-block" href="index.html?next=game">Sign in →</a>
+      <select class="inp who-select" id="whoSelect" aria-label="Choose your name" hidden>
         <option value="">Choose your name…</option>
       </select>
+    </div>
+  </section>
+
+  <!-- ============================================ WAITING FOR THE DRAW -->
+  <section id="waitSec" hidden>
+    <div class="card preseason">
+      <div class="ps-suits" aria-hidden="true">
+        <span class="b">♠</span><span class="r">♥</span><span class="r">♦</span><span class="b">♣</span>
+      </div>
+      <h3 id="waitTitle">Seats haven't been drawn yet</h3>
+      <p id="waitBody"></p>
+      <div class="ps-meta" id="waitMeta"></div>
     </div>
   </section>
 
@@ -301,11 +314,11 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=14"></script>
-<script src="data.js?v=14"></script>
-<script src="app-core.js?v=14"></script>
-<script src="fx.js?v=14"></script>
-<script src="game-state.js?v=14"></script>
+<script src="firebase-config.js?v=18"></script>
+<script src="data.js?v=18"></script>
+<script src="app-core.js?v=18"></script>
+<script src="fx.js?v=18"></script>
+<script src="game-state.js?v=18"></script>
 <script>
 (function () {
   "use strict";
@@ -419,12 +432,50 @@
     const who   = me();
     const night = isGameNight();
     const none  = !night && nothingScheduled();
+    /* Before the draw this page had nothing on it at all -- a player opening
+       The Table on game night got a blank screen and no idea whether they
+       were meant to do something. Say what is happening and who does it. */
+    const waiting = !!who && !night && !none;
     fillWhoSelect();
+    /* One sign-in screen for the whole app. Anyone who opens The Table
+       cold gets sent to it, and comes straight back here afterwards. */
+    if (!who && !renderPhase._sent) {
+      renderPhase._sent = true;
+      location.replace("index.html?next=game");
+      return;
+    }
     document.getElementById("whoSec").hidden   = !!who;
     document.getElementById("noneSec").hidden  = !who || !none;
+    document.getElementById("waitSec").hidden  = !waiting;
     document.getElementById("nightSec").hidden = !who || !night;
     if (none) renderNone();
+    if (waiting) renderWaiting();
     if (who) document.getElementById("whoSelect").value = who;
+  }
+
+  function renderWaiting() {
+    const who = me();
+    const S = Game.state();
+    const inField = !!S.players[who];
+    const n = Game.entrants().length;
+    const rsvp = S.rsvp[who] || "";
+
+    document.getElementById("waitTitle").textContent =
+      n ? "Waiting on the seat draw" : "Nothing started yet tonight";
+
+    document.getElementById("waitBody").textContent = inField
+      ? "You're checked in. The table appears here the moment the seats are drawn, and you'll be able to update your chip count from it."
+      : n
+        ? "Check in with the host when you arrive. Once everyone's in, the seats get drawn and the table appears here."
+        : "The host checks players in at the door, then draws the seats. This page turns into the table when that happens.";
+
+    const bits = [];
+    bits.push(inField ? "You're <b>checked in</b>"
+                      : (rsvp === "in" ? "You RSVP'd <b>In</b>" : "Not checked in"));
+    if (n) bits.push("<b>" + n + "</b> checked in so far");
+    bits.push("Cards at <b>" + UI.esc(NG.time || "8:30") + "</b>");
+    document.getElementById("waitMeta").innerHTML =
+      bits.map(b => "<span>" + b + "</span>").join("");
   }
 
 
@@ -885,6 +936,7 @@
           '<button class="btn btn-sm btn-ghost" data-photo type="button">' +
             (Photos.has(name) ? "Change photo" : "Add a photo") + '</button>' +
         '</div>' +
+        (mine ? '<div class="ss-money" id="ssMoney"></div>' : '') +
         '<label class="tiny muted" for="ssChips">Chip count</label>' +
         '<input class="inp" id="ssChips" type="number" inputmode="numeric" min="0" step="25" ' +
           'value="' + (p.stack || "") + '" placeholder="e.g. 14200">' +
@@ -900,9 +952,43 @@
       '</div>';
     document.body.appendChild(wrap);
 
+    /* Your own buy-in and top-up, and the button to take one. Counts
+       immediately -- a league decision -- but it is capped at one and it
+       records that you claimed it, so the host can see and undo it. */
+    const money = wrap.querySelector("#ssMoney");
+    if (money) {
+      const paid = (p.buyins || 1) * NG.buyin + (p.rebuys || 0) * (NG.rebuy || NG.buyin);
+      const used = (p.rebuys || 0) >= (NG.maxTopUps || 1);
+      const open = Game.rebuyWindowOpen();
+      money.innerHTML =
+        '<div class="ssm-row"><span>In for</span><b>' + BPL.money(paid) + '</b></div>' +
+        '<div class="ssm-row"><span>Top-up</span><b>' +
+          (p.rebuys ? "used" + (Game.selfClaimed(name) ? " (yours)" : "") : "not used") + '</b></div>' +
+        (used
+          ? '<p class="tiny muted" style="margin:6px 0 0">One top-up a night — yours is in.</p>'
+          : !open
+            ? '<p class="tiny muted" style="margin:6px 0 0">Rebuys closed at the break.</p>'
+            : '<button class="btn btn-sm btn-block mt" data-rebuy type="button">' +
+              'I bought the ' + BPL.money(NG.rebuy || NG.buyin) + ' top-up (' +
+              BPL.chips(NG.rebuyStack) + ' chips)</button>');
+      const rb = money.querySelector("[data-rebuy]");
+      if (rb) rb.onclick = () => {
+        UI.confirm("Add your " + BPL.money(NG.rebuy || NG.buyin) + " top-up?",
+                   "This goes straight into tonight's pot. Tell the host you've paid.",
+                   "Yes, I paid")
+          .then(yes => {
+            if (!yes) return;
+            Game.claimRebuy(name).then(
+              () => { UI.toast("Top-up added — settle up with the host", "ok"); close(); render(); },
+              err => UI.toast(err.message, "bad"));
+          });
+      };
+    }
+
     const inp   = wrap.querySelector("#ssChips");
     const bbOut = wrap.querySelector("#ssBB");
-    const close = () => wrap.remove();
+    const onEsc = ev => { if (ev.key === "Escape") close(); };
+    const close = () => { wrap.remove(); window.removeEventListener("keydown", onEsc); };
 
     const showBB = () => {
       const v = Number(inp.value);
@@ -921,6 +1007,9 @@
     wrap.querySelector("[data-photo]").onclick = () => Photos.upload(name);
     wrap.querySelector("[data-no]").onclick = close;
     wrap.onclick = e => { if (e.target === wrap) close(); };
+    /* Escape closes it, like every other sheet in the app. Without this the
+       only way out on a desktop is finding the Cancel button. */
+    window.addEventListener("keydown", onEsc);
 
     const clr = wrap.querySelector("[data-clear]");
     if (clr) clr.onclick = () => Game.clearStack(name).then(close);
@@ -994,7 +1083,8 @@
         return '<div class="trk-row ' + (p.status === "out" ? "out" : "") + '">' +
           '<span class="nm">' + UI.esc(n) + '</span>' +
           '<span class="pl">' + (p.rebuys || 0) +
-            (LEAGUE.nextGame.maxTopUps ? '/' + LEAGUE.nextGame.maxTopUps : '') + '</span>' +
+            (LEAGUE.nextGame.maxTopUps ? '/' + LEAGUE.nextGame.maxTopUps : '') +
+            (Game.selfClaimed(n) ? '<small class="selfclaim">said so</small>' : '') + '</span>' +
           '<button class="btn btn-sm" data-rb-="' + UI.esc(n) + '">−</button>' +
           '<button class="btn btn-sm btn-primary" data-rb="' + UI.esc(n) + '">+ Add</button></div>';
       }).join("") : '<p class="empty tiny">Nobody checked in yet.</p>';

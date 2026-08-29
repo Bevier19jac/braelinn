@@ -20,24 +20,23 @@ const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!==undefined?'  '
  ok('countdown_visible', await p.locator('#hcUnits .hc-u').count()>0);
  console.log('     countdown reads:', (await p.locator('#hcUnits').innerText()).replace(/\n+/g,' '));
  console.log('     date reads     :', (await p.locator('#hcWhen').innerText()).replace(/\n+/g,' '));
- ok('rsvp_section_present', await p.locator('#rsvpList').count()>0);
- const rows = await p.locator('.rsvp-row').count();
- ok('rsvp_rows_rendered', rows>0, rows);
- const chips = await p.locator('.rsvp-row').first().locator('.chip').allInnerTexts();
- ok('three_toggles_per_row', chips.length===3, chips);
- ok('toggles_are_in_maybe_out', JSON.stringify(chips)===JSON.stringify(['In','Maybe','Out']), chips);
+ /* The page opens on the sign-in gate now -- sign in, then RSVP is YOUR
+    three buttons rather than the whole roster. */
+ ok('signin_gate_first', await p.locator('#signIn').isVisible());
+ await p.click('.si-row[data-n="Syd"]'); await p.waitForTimeout(700);
+ ok('rsvp_section_present', await p.locator('#myRsvp').count()>0);
+ const chips = await p.locator('#myRsvp .mychip').allInnerTexts();
+ ok('three_toggles', chips.length===3, chips);
+ ok('toggles_are_in_maybe_out', JSON.stringify(chips)===JSON.stringify(["I'm in",'Maybe',"I'm out"]), chips);
 
  console.log('\n== TOGGLING WORKS AND STICKS ==');
- const first = p.locator('.rsvp-row').first();
- const who = (await first.locator('.nm').innerText()).split('\n')[0].trim();
- await first.locator('.chip', {hasText:'In'}).first().click();
- await p.waitForTimeout(600);
- ok('in_is_on', await first.locator('.chip.on').innerText()==='In');
- await first.locator('.chip', {hasText:'Maybe'}).first().click();
- await p.waitForTimeout(600);
- ok('can_switch_to_maybe', await first.locator('.chip.on').innerText()==='Maybe');
+ const who = 'Syd';
+ await p.click('#myRsvp .mychip.in'); await p.waitForTimeout(600);
+ ok('in_is_on', await p.locator('#myRsvp .mychip.on').innerText()==="I'm in");
+ await p.click('#myRsvp .mychip.maybe'); await p.waitForTimeout(600);
+ ok('can_switch_to_maybe', await p.locator('#myRsvp .mychip.on').innerText()==='Maybe');
  await p.reload({waitUntil:'networkidle'}); await p.waitForTimeout(900);
- ok('survives_reload', await p.locator('.rsvp-row').first().locator('.chip.on').innerText()==='Maybe');
+ ok('survives_reload', await p.locator('#myRsvp .mychip.on').innerText()==='Maybe');
  console.log('     toggled for   :', who);
 
  console.log('\n== NAV ==');

@@ -71,6 +71,8 @@
                 "stack":   { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000" },
                 "stackAt": { ".validate": "newData.isNumber()" },
                 "stackBy": { ".validate": "newData.isString() && newData.val().length <= 40" },
+                "rebuyBy": { ".validate": "newData.isString() && newData.val().length <= 40" },
+                "rebuyAt": { ".validate": "newData.isNumber()" },
                 "buyins":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10" },
                 "rebuys":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 20" },
                 "late":    { ".validate": "newData.isBoolean()" },

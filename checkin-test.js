@@ -10,6 +10,9 @@ const say=(k,v)=>console.log('  '+k+': '+(typeof v==='string'?v:JSON.stringify(v
  const b=await chromium.launch();const c=await b.newContext({viewport:{width:390,height:844}});
  await c.route('**/gstatic.com/**',r=>r.abort());
  const p=await c.newPage();const errs=[];p.on('pageerror',e=>errs.push(e.message));
+ // /* The Table now bounces anyone not signed in to the sign-in screen, so seed an identity before the first load. */
+ await p.goto('http://localhost:8953/index.html',{waitUntil:'domcontentloaded'});
+ await p.evaluate(()=>{try{localStorage.setItem('bpl_me','Nate')}catch(e){}});
  await p.goto('http://localhost:8953/game.html',{waitUntil:'networkidle'});
  await p.evaluate(async()=>{ sessionStorage.setItem('bpl_admin_ok','1'); localStorage.setItem('bpl_me','Jacob');
    await Game.resetNight(); await Game.start();
