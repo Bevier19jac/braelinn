@@ -27,6 +27,17 @@ if not defined GIT (
   exit /b 1
 )
 
+REM --- Clear stale lock files. GitHub Desktop and crashed git runs leave
+REM     .git\index.lock behind, and every later commit then dies with
+REM     "another git process seems to be running". Nothing here is data --
+REM     each of these is a scratch file git deletes itself when it succeeds.
+for %%L in (".git\index.lock" ".git\HEAD.lock" ".git\refs\heads\main.lock") do (
+  if exist "%%~L" (
+    echo   Clearing a stale lock: %%~L
+    del /f /q "%%~L" >nul 2>&1
+  )
+)
+
 echo.
 echo   Braelinn Poker League
 echo   ---------------------
