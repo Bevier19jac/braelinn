@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 
@@ -276,6 +276,27 @@
       <div class="sec-head"><h2>Payouts</h2><span class="hint" id="payHint"></span></div>
       <div class="sched" id="payoutList"></div>
       <p class="tiny muted mt" id="payoutNote"></p>
+
+      <div class="card mt moneycfg">
+        <label class="tiny muted" for="cfgKitty">Season kitty</label>
+        <div class="row2">
+          <input class="inp" id="cfgKitty" type="number" inputmode="decimal"
+                 min="0" max="50" step="0.5" placeholder="0">
+          <button class="btn btn-primary" id="btnKitty" type="button">Set %</button>
+        </div>
+        <p class="tiny muted" id="kittyNote" style="margin:8px 0 14px"></p>
+
+        <label class="tiny muted" for="cfgSplits">Payout splits — percentages, best finish first</label>
+        <div class="row2">
+          <input class="inp" id="cfgSplits" type="text" inputmode="numeric"
+                 placeholder="50, 30, 20">
+          <button class="btn btn-primary" id="btnSplits" type="button">Set</button>
+        </div>
+        <p class="tiny muted" id="splitsNote" style="margin:8px 0 0"></p>
+        <button class="btn btn-sm btn-block mt" id="btnSplitsReset" type="button">
+          Back to the automatic table
+        </button>
+      </div>
     </section>
 
     <section id="rebuySec">
@@ -293,11 +314,11 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=7"></script>
-<script src="data.js?v=7"></script>
-<script src="app-core.js?v=7"></script>
-<script src="fx.js?v=7"></script>
-<script src="game-state.js?v=7"></script>
+<script src="firebase-config.js?v=8"></script>
+<script src="data.js?v=8"></script>
+<script src="app-core.js?v=8"></script>
+<script src="fx.js?v=8"></script>
+<script src="game-state.js?v=8"></script>
 <script>
 (function () {
   "use strict";
@@ -944,8 +965,8 @@
       (m.kitty ? " · " + BPL.money(m.kitty) + " to the season kitty" : "") +
       " · " + BPL.money(m.net) + " playing for.";
 
-    const amounts = BPL.payoutTable(m.net, m.entries || 1);
-    const splits = BPL.splitsFor(m.entries || 1);
+    const amounts = BPL.payoutTable(m.net, m.entries || 1, Game.splits(m.entries || 1));
+    const splits = Game.splits(m.entries || 1);
     document.getElementById("payHint").textContent = splits.length + " paid";
     document.getElementById("payoutList").innerHTML = amounts.map((a, i) =>
       '<div class="payout-row"><span class="pl">' + Game.ordinal(i + 1) + '</span>' +
@@ -965,18 +986,67 @@
         const p = S.players[n];
         return '<div class="trk-row ' + (p.status === "out" ? "out" : "") + '">' +
           '<span class="nm">' + UI.esc(n) + '</span>' +
-          '<span class="pl">' + (p.rebuys || 0) + '</span>' +
+          '<span class="pl">' + (p.rebuys || 0) +
+            (LEAGUE.nextGame.maxTopUps ? '/' + LEAGUE.nextGame.maxTopUps : '') + '</span>' +
           '<button class="btn btn-sm" data-rb-="' + UI.esc(n) + '">−</button>' +
           '<button class="btn btn-sm btn-primary" data-rb="' + UI.esc(n) + '">+ Add</button></div>';
       }).join("") : '<p class="empty tiny">Nobody checked in yet.</p>';
     }
   }
 
+  /* ------------------------------------------------------------ MONEY
+     Kitty and payouts are league decisions, so they are set here on the
+     night rather than edited into a file. Both are validated before they
+     are stored: a kitty over 50%% or splits that do not total 100 are
+     refused, because finding that out while paying people is worse. */
+  function renderMoneyCfg() {
+    const m = Game.pot();
+    const custom = !!(Game.state().money && Game.state().money.splits);
+    const k = document.getElementById("cfgKitty");
+    if (k && document.activeElement !== k) k.value = Game.kittyPct();
+
+    const kn = document.getElementById("kittyNote");
+    if (kn) kn.textContent = Game.kittyPct() > 0
+      ? BPL.money(m.kitty) + " of tonight's " + BPL.money(m.gross) + " is held back."
+      : "Nothing held back — the whole pot pays out tonight.";
+
+    const sp = document.getElementById("cfgSplits");
+    if (sp && document.activeElement !== sp) sp.value = Game.splits(m.entries || 1).join(", ");
+
+    const sn = document.getElementById("splitsNote");
+    if (sn) sn.textContent = custom
+      ? "Using your splits for every field size."
+      : "Automatic: scales with how many played (" + Game.splits(m.entries || 1).length + " paid tonight).";
+    const rb = document.getElementById("btnSplitsReset");
+    if (rb) rb.hidden = !custom;
+  }
+
+  UI.on("btnKitty", "click", () => {
+    Game.setKittyPct(document.getElementById("cfgKitty").value)
+      .then(() => UI.toast("Kitty set", "ok"), e => UI.toast(e.message, "bad"));
+  });
+  UI.on("btnSplits", "click", () => {
+    const raw = document.getElementById("cfgSplits").value.split(/[^0-9.]+/);
+    Game.setSplits(raw).then(() => UI.toast("Payouts set", "ok"), e => UI.toast(e.message, "bad"));
+  });
+  UI.on("btnSplitsReset", "click", () => {
+    Game.setSplits([]).then(() => UI.toast("Back to the automatic table", "ok"));
+  });
+
   UI.on("rebuyList", "click", e => {
     const add = e.target.closest("button[data-rb]");
     const sub = e.target.closest("button[data-rb-]");
     if (!(add || sub) || !Admin.require()) return;
-    if (add) Game.addRebuy(add.dataset.rb).then(render);
+    if (add) {
+      const n = add.dataset.rb;
+      Game.addRebuy(n).then(render, err => {
+        /* One top-up per player is the rule, but Nate is the tournament
+           director -- if the table agrees, he can override it knowingly. */
+        UI.confirm(err.message, "Add it anyway?").then(yes => {
+          if (yes) Game.addRebuy(n, true).then(render);
+        });
+      });
+    }
     if (sub) Game.removeRebuy(sub.getAttribute("data-rb-")).then(render);
   });
 
@@ -1031,27 +1101,56 @@
   };
 
   /* Add anyone — roster player who didn't RSVP, or a late arrival. */
+  /* Add somebody to tonight. Roster names are one tap; a walk-in who has
+     never played before is typed in. Their name becomes a database key, so
+     the characters Firebase forbids are refused up front rather than
+     failing halfway through check-in. */
+  /* A sentinel that can never be a real name: "$" is one of the characters
+     Firebase forbids in a key, so addWalkIn() rejects it anyway. */
+  const WALKIN = "$walk-in$";
+
+  function addWalkIn() {
+    const raw = window.prompt("Name of the player (as it should appear all season):");
+    if (raw === null) return Promise.resolve(null);
+    const name = raw.trim().replace(/\s+/g, " ");
+    if (!name) return Promise.resolve(null);
+    if (name.length > 40) { UI.toast("That name is too long", "bad"); return Promise.resolve(null); }
+    if (/[.$#\[\]/]/.test(name)) {
+      UI.toast("No . $ # [ ] or / in a name, sorry — the database uses it as a key", "bad");
+      return Promise.resolve(null);
+    }
+    if (Game.state().players[name]) { UI.toast(name + " is already in", "info"); return Promise.resolve(null); }
+    return Promise.resolve(name);
+  }
+
   document.getElementById("btnAddPlayer").onclick = () => {
     if (!Admin.require()) return;
     const S = Game.state();
     const avail = LEAGUE.standings
       .filter(p => !S.players[p.name])
       .map(p => ({ value: p.name, label: p.name, sub: p.fullName }));
-    if (!avail.length) { UI.toast("Everyone on the roster is already in", "info"); return; }
 
-    UI.pick("Add player", avail).then(name => {
-      if (!name) return;
-      const started = Game.clock().started;
-      Game.checkIn(name, { late: started }).then(() => {
-        if (started) {
-          return Game.seatLatecomer(name).then(seat => {
-            UI.toast(name + " added" + (seat ? " — seat " + seat : "") + ", no bonus chips", "ok");
-          });
-        }
-        UI.toast(name + " checked in", "ok");
-      }).then(render);
+    avail.unshift({ value: WALKIN, label: "+ Someone not on the list",
+                    sub: "Type a name — they'll score like anyone else" });
+
+    UI.pick("Add player", avail).then(picked => {
+      if (!picked) return;
+      const step = picked === WALKIN ? addWalkIn() : Promise.resolve(picked);
+      step.then(name => {
+        if (!name) return;
+        const started = Game.clock().started;
+        return Game.checkIn(name, { late: started }).then(() => {
+          if (started) {
+            return Game.seatLatecomer(name).then(seat => {
+              UI.toast(name + " added" + (seat ? " — seat " + seat : "") + ", no bonus chips", "ok");
+            });
+          }
+          UI.toast(name + " checked in", "ok");
+        }).then(render);
+      });
     });
   };
+
 
   /* =============================================================== HOST  */
   function refreshHostUI() {
@@ -1170,6 +1269,7 @@
       renderPlayers();
       renderSeats();
       renderMoney();
+      renderMoneyCfg();
       renderCheckin();
 
       const act = Game.active().length;

@@ -22,7 +22,13 @@
 
         "config": {
           ".write": true,
-          "pin": {
+          "money": {
+        "_comment": "Kitty % and payout splits, set by the host on game night.",
+        "kittyPct": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 50" },
+        "splits":   { ".validate": "newData.hasChildren()" },
+        "$other":   { ".validate": false }
+      },
+      "pin": {
             ".validate": "newData.isString() && newData.val().length >= 4 && newData.val().length <= 12"
           },
           "$other": { ".validate": false }

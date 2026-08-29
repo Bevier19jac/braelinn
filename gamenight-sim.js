@@ -199,7 +199,9 @@ async function playNight(page, night, log) {
     } else if (roll < 0.26 && alive.length > 2) {
       /* Somebody rebuys. Sometimes after they were already marked out. */
       const who = pick(alive);
-      await page.evaluate(n => Game.addRebuy(n), who);
+      /* The one-top-up cap will refuse most of these now. That is the rule
+         holding, not a failure -- swallow it and carry on. */
+      await page.evaluate(n => Game.addRebuy(n).catch(() => {}), who);
       if (!await check(page, night, "step " + step + " rebuy " + who)) return errs;
       log.rebuys++;
     } else if (roll < 0.32) {
@@ -215,7 +217,9 @@ async function playNight(page, night, log) {
       const outs = await page.evaluate(() => Game.busted());
       if (outs.length) {
         const who = pick(outs);
-        await page.evaluate(n => Game.addRebuy(n), who);
+        /* Reinstating a busted player IS the host-override case, so keep
+           exercising that path rather than letting the cap swallow it. */
+        await page.evaluate(n => Game.addRebuy(n, true), who);
         alive = await page.evaluate(() => Game.active());
         if (!await check(page, night, "step " + step + " reinstate " + who)) return errs;
         log.reinstates++;

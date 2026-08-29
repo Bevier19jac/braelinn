@@ -177,7 +177,9 @@ async function playGame(gameNo) {
   for (let i = 0, k = ri(0, 6); i < k; i++) {
     const who = Game.entrants();
     if (!who.length) break;
-    await Game.addRebuy(pick(who));
+    /* One top-up per player is enforced now, so a second attempt is
+       expected to be refused. That is the rule working, not a failure. */
+    await Game.addRebuy(pick(who)).catch(() => {});
   }
 
   /* --- play it out: eliminate until one remains, with chaos --- */
@@ -319,7 +321,7 @@ async function scenarios() {
     const victim = names[0];
     await Game.confirmOut(victim);
     chk(Game.busted().includes(victim), "rebuy: victim should be out first", {});
-    await Game.addRebuy(victim);
+    await Game.addRebuy(victim).catch(() => {});
     chk(Game.active().includes(victim), "rebuy: player not back in", {});
     chk(!Game.busted().includes(victim), "rebuy: still counted as busted", {});
     chk(Game.state().players[victim].bustAt == null,
@@ -496,6 +498,42 @@ async function scenarios() {
      covers Firebase handing back `finish` as an object rather than an
      array, which happens whenever the row keys are not a clean 0..n-1.
      ------------------------------------------------------------------- */
+  /* ---------------------------------------------------------------------
+     ONE TOP-UP PER PLAYER.
+     Confirmed 29 Aug: a player gets one $30 top-up for the whole night,
+     rebuy or add-on. The host can override knowingly; nothing else can.
+     ------------------------------------------------------------------- */
+  async function topUpCapHolds() {
+    const fails = [];
+    const chk = (c, m, d) => { if (!c) fails.push({ msg: m, detail: d || {} }); };
+    const ctx = loadEngine();
+    const { Game, LEAGUE } = ctx;
+    Game.start();
+    for (const n of ["Nate", "Jacob", "Aaron"]) await Game.checkIn(n, {});
+
+    await Game.addRebuy("Nate");
+    chk(Game.state().players["Nate"].rebuys === 1, "first top-up should be allowed",
+        { got: Game.state().players["Nate"].rebuys });
+
+    let refused = false;
+    await Game.addRebuy("Nate").catch(() => { refused = true; });
+    chk(refused, "a second top-up must be refused");
+    chk(Game.state().players["Nate"].rebuys === 1,
+        "a refused top-up must not change the count",
+        { got: Game.state().players["Nate"].rebuys });
+
+    /* The host can still override -- deliberately, not accidentally. */
+    await Game.addRebuy("Nate", true);
+    chk(Game.state().players["Nate"].rebuys === 2,
+        "an explicit host override should go through",
+        { got: Game.state().players["Nate"].rebuys });
+
+    /* And the money must follow the real count, override included. */
+    const pot = Game.pot();
+    chk(pot.rebuys === 2, "pot must count the overridden top-up", { got: pot.rebuys });
+    return fails;
+  }
+
   function junkRecordsIgnored() {
     const { BPL } = loadEngine();
     const fails = [];
@@ -547,7 +585,7 @@ async function scenarios() {
   }
 
   console.log("\n== TARGETED EDGE CASES ==");
-  const scen = (await scenarios()).concat(junkRecordsIgnored());
+  const scen = (await scenarios()).concat(junkRecordsIgnored()).concat(await topUpCapHolds());
   if (scen.length) {
     scen.forEach(f => console.log("  ❌ " + f.msg + "  " + JSON.stringify(f.detail)));
     failures.push(...scen);

@@ -95,6 +95,7 @@
     players: {},
     reports: {},
     seats: null,
+    money: null,          // admin overrides for kitty % and payout splits
     timer: null,
     rsvp: {},
     _subs: []
@@ -128,6 +129,7 @@
       DB.on(BASE + "/seats",   v => { S.seats   = v || null;      emit(); });
       DB.on(BASE + "/timer",   v => { S.timer   = v || null;      emit(); });
       DB.on("rsvp/" + GAME_ID, v => { S.rsvp    = v || {};        emit(); });
+      DB.on("config/money",    v => { S.money   = v || null;      emit(); });
     },
 
     state() { return S; },
@@ -147,6 +149,50 @@
       return Object.keys(S.players).reduce((s, n) => s + (S.players[n].rebuys || 0), 0);
     },
 
+    /* ------------------------------------------------------------------ *
+     * MONEY POLICY                                                        *
+     * The kitty percentage and the payout splits are league decisions, not
+     * code. They live in the database so Nate can change them on the night
+     * without anyone editing a file, and they fall back to the numbers in
+     * data.js when nobody has set them.
+     * ------------------------------------------------------------------ */
+
+    kittyPct() {
+      const m = S.money;
+      if (m && typeof m.kittyPct === "number") return m.kittyPct;
+      return LEAGUE.payouts.kittyPct || 0;
+    },
+
+    /** Payout splits for a field size: admin override first, table second. */
+    splits(field) {
+      const m = S.money;
+      if (m && Array.isArray(m.splits) && m.splits.length) return m.splits.slice();
+      return BPL.splitsFor(field || 1);
+    },
+
+    setKittyPct(pct) {
+      const n = Number(pct);
+      if (!isFinite(n) || n < 0 || n > 50) {
+        return Promise.reject(new Error("Kitty must be between 0 and 50 percent"));
+      }
+      return DB.save("kitty " + n + "%", () => DB.set("config/money/kittyPct", n));
+    },
+
+    /**
+     * Payout splits as whole percentages, best finish first. They must add up
+     * to 100 -- a payout table that does not is how you end up short at the
+     * end of the night with everyone watching.
+     */
+    setSplits(arr) {
+      const a = (arr || []).map(Number).filter(n => isFinite(n) && n > 0);
+      if (!a.length) return DB.save("clear payouts", () => DB.set("config/money/splits", null));
+      const total = a.reduce((x, y) => x + y, 0);
+      if (Math.round(total) !== 100) {
+        return Promise.reject(new Error("Splits add up to " + total + "%, they must total 100%"));
+      }
+      return DB.save("payout splits", () => DB.set("config/money/splits", a));
+    },
+
     /** Money on the table right now, straight from live state. */
     pot() {
       const buyin = LEAGUE.nextGame.buyin;
@@ -154,7 +200,7 @@
       const entries = Game.fieldSize();
       const rebuys  = Game.totalRebuys();
       const gross   = entries * buyin + rebuys * rebuy;
-      const kitty   = Math.round(gross * (LEAGUE.payouts.kittyPct || 0) / 100);
+      const kitty   = Math.round(gross * Game.kittyPct() / 100);
       return { entries: entries, rebuys: rebuys, gross: gross, kitty: kitty, net: gross - kitty };
     },
 
@@ -422,9 +468,20 @@
      * would order them wrongly if they bust again later.
      * (Previously this also wrote a `place` field that no longer exists.)
      */
-    addRebuy(name) {
+    /**
+     * Rebuy or add-on. Both cost the same and both count against the SAME
+     * one-per-player allowance, so this is capped rather than a counter that
+     * grows. Nate can still override from Master Control if the table agrees.
+     */
+    addRebuy(name, override) {
       const p = S.players[name];
       if (!p) return Promise.resolve();
+      const cap = LEAGUE.nextGame.maxTopUps;
+      if (!override && typeof cap === "number" && (p.rebuys || 0) >= cap) {
+        return Promise.reject(new Error(
+          name + " has already used their top-up for tonight" +
+          (cap === 1 ? " (one per player)" : " (" + cap + " per player)") + "."));
+      }
       const wasOut = p.status === "out";
       return DB.save("rebuy for " + name,
         () => DB.update(BASE + "/players/" + name, {
@@ -521,7 +578,7 @@
       const winner = act[0];
       const field = Game.fieldSize();
       const money = Game.pot();
-      const payTable = BPL.payoutTable(money.net, field);
+      const payTable = BPL.payoutTable(money.net, field, Game.splits(field));
 
       const order = Game.finishOrder();                 // busted, best place first
       const finish = [{ place: 1, name: winner }].concat(order);
@@ -566,7 +623,7 @@
         rebuyAmount: LEAGUE.nextGame.rebuy || LEAGUE.nextGame.buyin,
         rebuys: money.rebuys,
         gross: money.gross,
-        kittyPct: LEAGUE.payouts.kittyPct || 0,
+        kittyPct: Game.kittyPct(),
         kitty: money.kitty,
         pot: money.net,
         winner: winner,

@@ -149,6 +149,8 @@ const LEAGUE = {
     time: "8:30 PM",      // CONFIRMED — games always start 8:30
     buyin: 30,          // CONFIRMED
     rebuy: 30,          // CONFIRMED — same price for a rebuy or the 6,000-chip add-on
+    maxTopUps: 1,       // CONFIRMED 29 Aug — ONE top-up per player, all night,
+                        // whether they take it as a rebuy or as the add-on.
     startStack: 7000,   // CONFIRMED — buy-in gets you 7,000
     rebuyStack: 6000,   // CONFIRMED — rebuy gets you 6,000 (1k less than a fresh buy-in)
     earlyBonus: 500,    // CONFIRMED — 500 bonus chips for being on time
@@ -166,36 +168,30 @@ const LEAGUE = {
      mins = length of the level. break:true renders as a break instead.
      ------------------------------------------------------------------------ */
   blinds: [
-    /* CONFIRMED: starts 50/100, 20-minute levels, and runs up to 300/600
-       just before the first break. No 150/300 level.
+    /* CONFIRMED with Nate, 29 Aug 2026: the full ladder, and NO ANTES at any
+       level. The antes that used to sit on levels 5-8 were my guess and have
+       been removed -- a wrong number on the clock is worse than no number.
 
-       The first break is the REBUY / ADD-ON deadline — last chance to rebuy
-       or buy 6,000 more chips. After it, the game plays down.
+       The break after 300/600 is the deadline: last chance to rebuy, or to
+       buy the 6,000-chip add-on. One top-up per player for the whole night,
+       whichever form it takes. After the break the game just plays down. */
+    { level: 1,  sb: 50,    bb: 100,    ante: 0, mins: 20 },
+    { level: 2,  sb: 100,   bb: 200,    ante: 0, mins: 20 },
+    { level: 3,  sb: 200,   bb: 400,    ante: 0, mins: 20 },
+    { level: 4,  sb: 300,   bb: 600,    ante: 0, mins: 20 },
 
-       Levels 5+ below (antes, the shorter levels, the second break) are still
-       a reasonable guess — confirm and edit. */
-    { level: 1,  sb: 50,    bb: 100,    ante: 0,     mins: 20 },
-    { level: 2,  sb: 100,   bb: 200,    ante: 0,     mins: 20 },
-    { level: 3,  sb: 200,   bb: 400,    ante: 0,     mins: 20 },
-    { level: 4,  sb: 300,   bb: 600,    ante: 0,     mins: 20 },
-    { level: 0,  sb: 0,     bb: 0,      ante: 0,     mins: 10, break: true,
+    { level: 0,  sb: 0,     bb: 0,      ante: 0, mins: 10, break: true,
       label: "BREAK — Last Rebuy / Add-On (6,000 chips)", lastRebuy: true },
 
-    { level: 5,  sb: 400,   bb: 800,    ante: 800,   mins: 20 },
-    { level: 6,  sb: 600,   bb: 1200,   ante: 1200,  mins: 20 },
-    { level: 7,  sb: 800,   bb: 1600,   ante: 1600,  mins: 20 },
-    { level: 8,  sb: 1000,  bb: 2000,   ante: 2000,  mins: 20 },
-    { level: 0,  sb: 0,     bb: 0,      ante: 0,     mins: 10, break: true,
-      label: "BREAK — Colour Up / Consolidate Tables" },
-
-    { level: 9,  sb: 1500,  bb: 3000,   ante: 3000,  mins: 15 },
-    { level: 10, sb: 2000,  bb: 4000,   ante: 4000,  mins: 15 },
-    { level: 11, sb: 3000,  bb: 6000,   ante: 6000,  mins: 15 },
-    { level: 12, sb: 4000,  bb: 8000,   ante: 8000,  mins: 15 },
-    { level: 13, sb: 5000,  bb: 10000,  ante: 10000, mins: 15 },
-    { level: 14, sb: 8000,  bb: 16000,  ante: 16000, mins: 15 },
-    { level: 15, sb: 10000, bb: 20000,  ante: 20000, mins: 15 }
+    { level: 5,  sb: 500,   bb: 1000,   ante: 0, mins: 20 },
+    { level: 6,  sb: 600,   bb: 1200,   ante: 0, mins: 20 },
+    { level: 7,  sb: 1000,  bb: 2000,   ante: 0, mins: 20 },
+    { level: 8,  sb: 2500,  bb: 5000,   ante: 0, mins: 20 },
+    { level: 9,  sb: 3000,  bb: 6000,   ante: 0, mins: 20 },
+    { level: 10, sb: 4000,  bb: 8000,   ante: 0, mins: 20 },
+    { level: 11, sb: 5000,  bb: 10000,  ante: 0, mins: 20 }
   ],
+
 
   /* --------------------------------------------------------------------------
      POINTS — TODO: confirm this is how Braelinn actually scores.
@@ -227,9 +223,25 @@ const LEAGUE = {
   },
 
   points: {
+    /* CONFIRMED: 300 for busting first, +300 for every place you climb.
+       So in a 20-handed field the winner takes 6,000. */
     perPlaceMultiplier: 300,
+
+    /* RULE NEEDS CONFIRMATION — a top-finishers bonus.
+       Jacob recalls Nate mentioning "a bonus once you reach the top 5 or so"
+       but not the amounts. The mechanism below is built and tested; it is
+       switched OFF because nobody has confirmed the numbers, and inventing
+       them would quietly change who wins the season.
+
+       To turn it on, list the bonus for 1st, 2nd, 3rd... e.g.
+           placeBonus: [1500, 1000, 750, 500, 250]
+       Standings recompute from history the moment it changes -- raw results
+       are never rewritten, so switching it on later costs nothing. */
+    placeBonus: [],
+
     describe: "Points = (players outlasted + 1) × 300. Win a 20-handed field, take 6,000."
   },
+
 
   /* --------------------------------------------------------------------------
      PAYOUT STRUCTURE — % of prize pool by field size. Editable live on game.html.
@@ -291,7 +303,9 @@ const BPL = {
   /** Points a player earns for finishing `place` out of `field`.
       LEAGUE RULE — do not change without Nate. */
   pointsFor(place, field) {
-    return (field - place + 1) * LEAGUE.points.perPlaceMultiplier;
+    const base  = (field - place + 1) * LEAGUE.points.perPlaceMultiplier;
+    const bonus = (LEAGUE.points.placeBonus || [])[place - 1] || 0;
+    return base + bonus;
   },
 
   /**
@@ -299,8 +313,9 @@ const BPL = {
    * the remainder pushed into 1st, so the payouts always sum to the pot exactly.
    * Returns an array indexed by (place - 1).
    */
-  payoutTable(net, field) {
-    const splits = BPL.splitsFor(field || 1);
+  payoutTable(net, field, splitsOverride) {
+    const splits = (Array.isArray(splitsOverride) && splitsOverride.length)
+      ? splitsOverride : BPL.splitsFor(field || 1);
     const amounts = splits.map(p => Math.round(net * p / 100 / 5) * 5);
     const drift = net - amounts.reduce((a, b) => a + b, 0);
     if (amounts.length) amounts[0] += drift;
