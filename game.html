@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
 
@@ -301,11 +301,11 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=12"></script>
-<script src="data.js?v=12"></script>
-<script src="app-core.js?v=12"></script>
-<script src="fx.js?v=12"></script>
-<script src="game-state.js?v=12"></script>
+<script src="firebase-config.js?v=13"></script>
+<script src="data.js?v=13"></script>
+<script src="app-core.js?v=13"></script>
+<script src="fx.js?v=13"></script>
+<script src="game-state.js?v=13"></script>
 <script>
 (function () {
   "use strict";
@@ -366,10 +366,20 @@
   });
 
 
-  /** Game night has begun the moment seats exist. Before that, it's RSVP. */
+  /**
+   * Game night has begun when seats are drawn AND people are actually
+   * checked in.
+   *
+   * Seats alone are not enough. A seat draw left behind from testing, with
+   * nobody checked in, is a nonsense state -- but it used to be enough to
+   * flip the whole app into game-night mode and show a table full of names
+   * to every player who opened the link. It did exactly that on the live
+   * site on 29 Aug. Requiring real entrants makes that impossible.
+   */
   function isGameNight() {
     const st = Game.state();
-    return !!(st.seats && Array.isArray(st.seats.order) && st.seats.order.length);
+    const seated = !!(st.seats && Array.isArray(st.seats.order) && st.seats.order.length);
+    return seated && Game.entrants().length > 0;
   }
 
   /**
@@ -1130,7 +1140,7 @@
     avail.unshift({ value: WALKIN, label: "+ Someone not on the list",
                     sub: "Type a name — they'll score like anyone else" });
 
-    UI.pick("Add player", avail).then(picked => {
+    UI.pick("Add player — " + (avail.length - 1) + " on the roster", avail).then(picked => {
       if (!picked) return;
       const step = picked === WALKIN ? addWalkIn() : Promise.resolve(picked);
       step.then(name => {

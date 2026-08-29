@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
 
@@ -185,10 +185,10 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=12"></script>
-<script src="data.js?v=12"></script>
-<script src="app-core.js?v=12"></script>
-<script src="fx.js?v=12"></script>
+<script src="firebase-config.js?v=13"></script>
+<script src="data.js?v=13"></script>
+<script src="app-core.js?v=13"></script>
+<script src="fx.js?v=13"></script>
 <script>
 (function () {
   "use strict";
@@ -522,10 +522,17 @@
     const box = document.getElementById("seatOut");
     const hint = document.getElementById("seatHint");
 
-    const btn = document.getElementById("btnWhereSit");
-    if (btn) btn.hidden = !(liveSeats && Array.isArray(liveSeats.order) && liveSeats.order.length);
+    /* Seats only count when people are actually checked in. A draw left
+       behind from testing, with nobody checked in, used to be enough to show
+       a table full of names to everyone who opened the link -- which is
+       exactly what happened on the live site on 29 Aug. */
+    const anyoneIn = Object.keys(livePlayers).length > 0;
+    const drawn = anyoneIn && !!(liveSeats && Array.isArray(liveSeats.order) && liveSeats.order.length);
 
-    if (!liveSeats || !Array.isArray(liveSeats.order) || !liveSeats.order.length) {
+    const btn = document.getElementById("btnWhereSit");
+    if (btn) btn.hidden = !drawn;
+
+    if (!drawn) {
       hint.textContent = "Game night";
       box.innerHTML = '<div class="card"><p class="seat-empty">' +
         'Seats get drawn on the night, once everyone is checked in. ' +
