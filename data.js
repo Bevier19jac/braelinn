@@ -14,6 +14,11 @@ const LEAGUE = {
   season: 7,
   location: "Peachtree City, GA",
 
+  /* Who gets offered the Master Control PIN prompt on identifying themselves.
+     This is convenience, not security -- the PIN is the only gate, and it is
+     bypassable by anyone who opens devtools. See SECURITY.md. */
+  hosts: ["Jacob", "Nate"],
+
   /* Short line shown in the hero and on the schedule page. */
   tagline: "Cards roll at 8:30",
 

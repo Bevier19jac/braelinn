@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<!-- ===================================================================
+     PUBLIC IDENTITY
+     Every page shares ONE title, description and share image on purpose.
+     Link scrapers (iMessage, WhatsApp, Slack) don't run JavaScript and
+     read only these static tags — so whichever page gets shared, the
+     preview says "Braelinn Poker League", never "Schedule — ...".
+     =================================================================== -->
+<title>Braelinn Poker League</title>
+<meta name="description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<link rel="canonical" href="https://bevier19jac.github.io/braelinn/">
+
+<meta property="og:site_name" content="Braelinn Poker League">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Braelinn Poker League">
+<meta property="og:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<meta property="og:url" content="https://bevier19jac.github.io/braelinn/">
+<meta property="og:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Braelinn Poker League — Season 7, Peachtree City GA">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Braelinn Poker League">
+<meta name="twitter:description" content="Season standings, RSVP, schedule, seat draw, and game-night hub for the Braelinn Poker League.">
+<meta name="twitter:image" content="https://bevier19jac.github.io/braelinn/social-card.png?v=2">
+
+<!-- ===================================================================
+     INSTALLED-APP BEHAVIOUR
+     apple-touch-icon is what stops iOS screenshotting the page and using
+     that as the home-screen icon. apple-mobile-web-app-title stops iOS
+     labelling the icon from <title>.
+     =================================================================== -->
+<link rel="manifest" href="manifest.json?v=2">
+<meta name="theme-color" content="#06120d">
+<meta name="color-scheme" content="dark">
+
+<link rel="icon" href="favicon.ico?v=2" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=2">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Braelinn Poker">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=6">
+</head>
+<body>
+
+<div id="nav"></div>
+
+<div class="wrap">
+  <header class="hero" style="padding-bottom:20px">
+    <p class="hero-eyebrow" id="eyebrow">Season 7</p>
+    <h1>Results</h1>
+    <p class="hero-sub" id="sub"></p>
+  </header>
+
+  <section id="emptySec" hidden>
+    <div class="card preseason">
+      <div class="ps-suits" aria-hidden="true">
+        <span class="b">♠</span><span class="r">♥</span><span class="r">♦</span><span class="b">♣</span>
+      </div>
+      <h3>No games finished yet</h3>
+      <p>Every finalized tournament lands here automatically — finishing order,
+         points and payouts. Nobody types it in.</p>
+    </div>
+  </section>
+
+  <section id="listSec" hidden>
+    <div class="sec-head"><h2>Every Game</h2><span class="hint" id="gamesHint"></span></div>
+    <div id="gamesList"></div>
+  </section>
+</div>
+
+<div id="footer"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js?v=6"></script>
+<script src="data.js?v=6"></script>
+<script src="app-core.js?v=6"></script>
+<script src="fx.js?v=6"></script>
+<script>
+(function () {
+  "use strict";
+  UI.mount("results.html");
+  document.getElementById("eyebrow").textContent = "Season " + LEAGUE.season;
+
+  function render(results) {
+    /* Read through the same guard the standings use, so a stray record in
+       /results can never show up here pretending to be a game either. */
+    const agg = BPL.aggregate(results || {});
+    const games = agg.games.slice().sort((a, b) => (b.finalizedAt || 0) - (a.finalizedAt || 0));
+
+    document.getElementById("emptySec").hidden = games.length > 0;
+    document.getElementById("listSec").hidden  = games.length === 0;
+    document.getElementById("sub").textContent = games.length
+      ? games.length + (games.length === 1 ? " game" : " games") + " in the books."
+      : "Nothing finalized yet.";
+    document.getElementById("gamesHint").textContent = games.length + " recorded";
+
+    document.getElementById("gamesList").innerHTML = games.map((g, i) => {
+      const rows = Array.isArray(g.finish) ? g.finish
+                 : Object.keys(g.finish || {}).map(k => g.finish[k]);
+      rows.sort((a, b) => a.place - b.place);
+      return '<details class="gamecard"' + (i === 0 ? " open" : "") + '>' +
+        '<summary><span><b>' + UI.esc(BPL.fmtShort(g.date)) + '</b>' +
+          '<small>' + UI.esc(g.winner) + ' won · ' + g.field + ' players' +
+          (g.rebuys ? ' · ' + g.rebuys + ' rebuys' : '') +
+          (g.pot ? ' · ' + BPL.money(g.pot) + ' pot' : '') + '</small></span>' +
+          '<span class="tag done">' + UI.esc(g.label || "Game") + '</span></summary>' +
+        '<div class="tbl-scroll"><table class="tbl">' +
+        '<thead><tr><th>#</th><th>Player</th><th>Pts</th><th>$</th></tr></thead><tbody>' +
+        rows.map(r =>
+          '<tr' + (r.place === 1 ? ' class="win"' : '') + '>' +
+          '<td class="num">' + r.place + '</td>' +
+          '<td>' + UI.esc(r.name) +
+            (r.rebuys ? ' <span class="tiny muted">+' + r.rebuys + 'r</span>' : '') + '</td>' +
+          '<td class="num">' + BPL.chips(r.points) + '</td>' +
+          '<td class="num">' + (r.winnings ? BPL.money(r.winnings) : "—") + '</td></tr>').join("") +
+        '</tbody></table></div></details>';
+    }).join("");
+  }
+
+  DB.on("results", v => render(v || {}));
+})();
+</script>
+</body>
+</html>

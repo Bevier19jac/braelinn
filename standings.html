@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 
@@ -113,10 +113,6 @@
     <p class="tiny muted mt" id="pointsNote"></p>
   </section>
 
-  <section id="gamesSec" hidden>
-    <div class="sec-head"><h2>Every Game</h2><span class="hint" id="gamesHint"></span></div>
-    <div id="gamesList"></div>
-  </section>
 
 </div>
 
@@ -124,10 +120,10 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=5"></script>
-<script src="data.js?v=5"></script>
-<script src="app-core.js?v=5"></script>
-<script src="fx.js?v=5"></script>
+<script src="firebase-config.js?v=6"></script>
+<script src="data.js?v=6"></script>
+<script src="app-core.js?v=6"></script>
+<script src="fx.js?v=6"></script>
 <script>
 (function () {
   "use strict";
@@ -152,7 +148,6 @@
     document.getElementById("sub").textContent = hasGames
       ? agg.gamesPlayed + (agg.gamesPlayed === 1 ? " game" : " games") + " in the books."
       : "Season " + LEAGUE.season + " hasn't started. Nothing to rank yet.";
-    document.getElementById("gamesSec").hidden = !hasGames;
     document.getElementById("tableSec").hidden = !hasGames;
     document.getElementById("preSec").hidden   = hasGames;
     document.getElementById("statSec").hidden  = !hasGames;
@@ -210,27 +205,6 @@
 
     document.getElementById("btnToggle").textContent =
       showAll ? "Regulars only" : "Show everyone (" + agg.players.length + ")";
-
-    /* -------- Game history, newest first -------- */
-    const games = agg.games.slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-    document.getElementById("gamesHint").textContent = games.length + " recorded";
-    document.getElementById("gamesList").innerHTML = games.map(g => {
-      const top = (g.finish || []).slice(0, 3);
-      return '<details class="gamecard"><summary>' +
-        '<span class="gdate">' + BPL.fmtShort(g.date) + '</span>' +
-        '<span class="gbody"><strong>' + UI.esc(g.winner || "—") + ' takes it</strong>' +
-        '<small>' + g.field + ' players · ' + BPL.money(g.pot) + ' pot' +
-        (g.rebuys ? ' · ' + g.rebuys + ' rebuys' : '') + '</small></span>' +
-        '<span class="tag done">' + UI.esc(g.label || "Game") + '</span></summary>' +
-        '<div class="tbl-scroll"><table class="tbl">' +
-        '<thead><tr><th>#</th><th>Player</th><th>Pts</th><th>$</th></tr></thead><tbody>' +
-        (g.finish || []).map(r =>
-          '<tr><td class="num">' + r.place + '</td><td>' + UI.esc(r.name) +
-          (r.rebuys ? ' <span class="tiny muted">+' + r.rebuys + 'r</span>' : '') + '</td>' +
-          '<td class="num">' + BPL.chips(r.points) + '</td>' +
-          '<td class="num">' + (r.winnings ? BPL.money(r.winnings) : "—") + '</td></tr>').join("") +
-        '</tbody></table></div></details>';
-    }).join("");
   }
 
   document.querySelectorAll("th[data-sort]").forEach(th => {

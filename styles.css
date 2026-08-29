@@ -1173,7 +1173,7 @@ body::after {
     0 12px 34px rgba(0,0,0,.5);
   display: grid; place-content: center; text-align: center; gap: 4px;
 }
-.felt-mark { font-size: 34px; color: #ffffff0f; line-height: 1; }
+.felt-mark { font-size: 30px; color: #ffffff0f; line-height: 1; }
 .felt-sub  { font-size: 10.5px; color: #ffffff4d; letter-spacing: .06em; }
 
 .bseat {
@@ -1217,3 +1217,214 @@ body::after {
   .bs-st { font-size: 8.5px; }
   .felt { inset: 29% 23%; }
 }
+
+/* ============================================================================
+   GAME PAGE — one screen, three states.
+   Who are you  ->  IN / OUT  ->  the table.
+   ========================================================================== */
+
+/* --- 1. WHO ARE YOU ------------------------------------------------------ */
+.whocard { text-align: center; padding: 34px 20px; }
+.who-h   { font-size: clamp(26px, 8vw, 36px); margin-bottom: 6px; }
+.who-sub { color: var(--ink-mute); margin: 0 0 22px; font-size: 14px; }
+.who-select {
+  font-size: 17px; padding: 15px 14px; text-align: center; text-align-last: center;
+  min-height: 54px;
+}
+
+/* --- 2. RSVP ------------------------------------------------------------- */
+.rsvpcard { padding: 24px 18px; }
+.rsvp-eyebrow {
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--brass); margin: 0 0 6px;
+}
+.rsvp-h   { font-size: clamp(23px, 7vw, 32px); line-height: 1.1; margin-bottom: 6px; }
+.rsvp-sub { color: var(--ink-mute); font-size: 14px; margin: 0 0 20px; }
+
+.rsvp-you {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-bottom: 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-s); background: #ffffff06;
+}
+.rsvp-you .ry-t { display: flex; flex-direction: column; line-height: 1.2; flex: 1; min-width: 0; }
+.rsvp-you .ry-t b     { font-size: 15px; }
+.rsvp-you .ry-t small { font-size: 11px; color: var(--ink-mute); }
+.rsvp-you .sec-toggle { flex: none; text-decoration: underline; }
+.rsvp-you .sec-toggle::after { content: ""; }
+
+/* Two targets, thumb-sized, impossible to mistake for each other. */
+.rsvp-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bigbtn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; min-height: 84px; padding: 12px;
+  border-radius: var(--radius); cursor: pointer;
+  border: 2px solid var(--line); background: #ffffff08; color: var(--ink);
+  font: inherit; transition: transform .06s ease;
+}
+.bigbtn:active { transform: scale(.97); }
+.bigbtn b     { font-size: 26px; letter-spacing: .06em; font-family: var(--display); }
+.bigbtn small { font-size: 11px; color: var(--ink-mute); }
+.bigbtn.in.picked  { border-color: var(--ok);  background: #4ade8022; }
+.bigbtn.in.picked b  { color: var(--ok); }
+.bigbtn.out.picked { border-color: var(--out); background: #f8717122; }
+.bigbtn.out.picked b { color: var(--out); }
+
+.rsvp-tally { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.rsvp-tally span {
+  font-size: 12px; padding: 6px 11px; border-radius: 999px;
+  border: 1px solid var(--line); background: #ffffff06; color: var(--ink-mute);
+}
+.rsvp-tally b { color: var(--brass-hi); font-family: var(--mono); }
+
+/* --- 3. GAME NIGHT ------------------------------------------------------- */
+#feltSec { margin-top: 14px; }
+.felt-bar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.felt-tabs { display: flex; gap: 6px; }
+.felt-tabs button {
+  flex: 1; min-height: 40px; font: inherit; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: #ffffff06; color: var(--ink-mute);
+}
+.felt-tabs button.on { border-color: var(--brass); color: var(--brass-hi); background: #d9ab5214; }
+.felt-stats { display: flex; gap: 6px; flex-wrap: wrap; }
+.felt-stats span {
+  font-size: 11.5px; padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: #ffffff06; color: var(--ink-mute);
+}
+.felt-stats b { color: var(--brass-hi); font-family: var(--mono); }
+.felt-stats .drift { border-color: #f8717155; background: #f8717114; color: var(--out); }
+.felt-note { text-align: center; margin: 10px 0 0; }
+.bs-nm i { font-style: normal; color: var(--card-red-hi); font-size: 9px; }
+
+/* --- MASTER CONTROL ------------------------------------------------------ */
+.mcbtn {
+  position: fixed; right: 14px; bottom: 14px; z-index: 60;
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 46px; padding: 0 16px; cursor: pointer;
+  border-radius: 999px; border: 1px solid var(--brass-dim);
+  background: linear-gradient(180deg, #d9ab52, #b8892f); color: #1a1206;
+  font: inherit; font-weight: 700; font-size: 13px;
+  box-shadow: 0 8px 22px rgba(0,0,0,.5);
+}
+.mcbtn[hidden] { display: none !important; }
+
+.mcdrawer { position: fixed; inset: 0; z-index: 70; }
+.mcdrawer[hidden] { display: none !important; }
+.mc-scrim { position: absolute; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
+.mc-sheet {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  max-height: 88vh; display: flex; flex-direction: column;
+  background: var(--felt-900); border-top: 1px solid var(--brass-dim);
+  border-radius: 18px 18px 0 0; box-shadow: 0 -14px 40px rgba(0,0,0,.6);
+}
+.mc-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
+}
+.mc-head h2 { font-size: 19px; }
+.mc-head div { display: flex; gap: 6px; }
+.mc-body { overflow: auto; padding: 4px 16px 28px; -webkit-overflow-scrolling: touch; }
+.mc-body section { margin-top: 18px; }
+
+@media (min-width: 720px) {
+  .mc-sheet { left: auto; right: 0; top: 0; bottom: 0; width: 420px;
+              max-height: none; border-radius: 0; border-left: 1px solid var(--brass-dim); }
+}
+
+/* --- RESULTS + PLAYERS --------------------------------------------------- */
+.gamecard { margin-bottom: 10px; }
+.tbl tr.win td { color: var(--brass-hi); font-weight: 700; }
+
+.rcard {
+  display: grid; grid-template-columns: 44px 1fr; gap: 12px;
+  padding: 12px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: #ffffff05; margin-bottom: 10px;
+}
+.rc-t { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.rc-t b     { font-size: 15px; }
+.rc-t small { font-size: 12px; color: var(--ink-mute); }
+.rc-t em    { font-size: 11.5px; color: var(--ink-dim); font-style: italic; margin-top: 3px; }
+.rc-s {
+  grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap;
+  border-top: 1px solid var(--line-soft); padding-top: 9px; margin-top: 2px;
+}
+.rc-s span {
+  font-size: 11px; color: var(--ink-dim);
+  padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: #ffffff05;
+}
+.rc-s b { color: var(--brass-hi); font-family: var(--mono); margin-right: 4px; }
+.rc-s .rc-none { color: var(--ink-dim); font-style: italic; border-style: dashed; }
+
+/* --- COMPACT CLOCK (game screen) ---------------------------------------- */
+.clockstrip {
+  padding: 12px 14px 10px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: linear-gradient(180deg, #14322450, #0a1c1450);
+}
+.cs-main {
+  display: grid; grid-template-columns: minmax(62px,1fr) auto minmax(62px,1fr);
+  align-items: center; gap: 8px;
+}
+.cs-lv {
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--brass); white-space: nowrap;
+}
+.cs-time {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: clamp(30px, 9.5vw, 44px); font-weight: 700; line-height: 1;
+  color: var(--ink); text-align: center;
+}
+.cs-bl { text-align: right; line-height: 1.15; }
+.cs-bl b     { display: block; font-family: var(--mono); font-size: 14px; color: var(--brass-hi); white-space: nowrap; }
+.cs-bl small { display: block; font-size: 10px; color: var(--ink-dim); white-space: nowrap; }
+.clockstrip .bar { margin: 9px 0 7px; }
+.cs-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 11px; color: var(--ink-dim); flex-wrap: wrap;
+}
+.cs-foot .state-pill { font-size: 9.5px; }
+.clockstrip .rebuy-window { margin-top: 8px; font-size: 11px; }
+
+/* On the last minute of a level the clock earns the attention. */
+.clockstrip.urgent { border-color: var(--card-red); background: linear-gradient(180deg,#3a161650,#0a1c1450); }
+.clockstrip.urgent .cs-time { color: var(--card-red-hi); }
+
+
+/* ============================================================================
+   THE TABLE, AS A MATERIAL
+   Felt and rail are generated with SVG fractal noise rather than shipped as
+   images: no download, no CDN, no weight, and it stays sharp at any size.
+   ========================================================================== */
+
+.birdtable { isolation: isolate; }
+
+/* The rail is a ring behind the felt, not a border on it. */
+.birdtable::before {
+  content: ""; position: absolute; inset: 23.5% 17%;
+  border-radius: 50% / 46%;
+  background:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22220%22%20height%3D%22220%22%3E%3Cfilter%20id%3D%22n%22%20x%3D%220%22%20y%3D%220%22%20width%3D%22100%25%22%20height%3D%22100%25%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.035%22%20numOctaves%3D%222%22%20seed%3D%2211%22%20stitchTiles%3D%22stitch%22%2F%3E%3CfeColorMatrix%20type%3D%22saturate%22%20values%3D%220%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20filter%3D%22url%28%23n%29%22%20opacity%3D%220.55%22%2F%3E%3C%2Fsvg%3E"),
+    linear-gradient(160deg, #6b4e28 0%, #3f2c14 38%, #5c4222 62%, #2f1f0e 100%);
+  background-blend-mode: overlay, normal;
+  background-size: 300px 300px, cover;
+  box-shadow:
+    inset 0 2px 3px rgba(255,255,255,.16),
+    inset 0 -3px 7px rgba(0,0,0,.5),
+    0 10px 30px rgba(0,0,0,.5);
+}
+
+.felt {
+  position: absolute; inset: 27.5% 21.5%; z-index: 1;
+  border-radius: 50% / 46%;
+  background:
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22220%22%20height%3D%22220%22%3E%3Cfilter%20id%3D%22n%22%20x%3D%220%22%20y%3D%220%22%20width%3D%22100%25%22%20height%3D%22100%25%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.9%22%20numOctaves%3D%224%22%20seed%3D%227%22%20stitchTiles%3D%22stitch%22%2F%3E%3CfeColorMatrix%20type%3D%22saturate%22%20values%3D%220%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20filter%3D%22url%28%23n%29%22%20opacity%3D%220.42%22%2F%3E%3C%2Fsvg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22220%22%20height%3D%22220%22%3E%3Cfilter%20id%3D%22n%22%20x%3D%220%22%20y%3D%220%22%20width%3D%22100%25%22%20height%3D%22100%25%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.16%22%20numOctaves%3D%223%22%20seed%3D%223%22%20stitchTiles%3D%22stitch%22%2F%3E%3CfeColorMatrix%20type%3D%22saturate%22%20values%3D%220%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20filter%3D%22url%28%23n%29%22%20opacity%3D%220.3%22%2F%3E%3C%2Fsvg%3E"),
+    radial-gradient(115% 125% at 50% 28%, #1f6044 0%, #124532 46%, #0a2a1e 100%);
+  background-blend-mode: overlay, soft-light, normal;
+  background-size: 110px 110px, 420px 420px, cover;
+  box-shadow:
+    inset 0 20px 50px rgba(0,0,0,.5),
+    inset 0 -10px 30px rgba(0,0,0,.38);
+  display: grid; place-content: center; text-align: center; gap: 4px;
+}
+.bseat { z-index: 2; }

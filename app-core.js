@@ -303,10 +303,11 @@
   const UI = {
     nav(active) {
       const links = [
-        { href: "index.html",     label: "Tonight",   icon: "♠" },
-        { href: "game.html",      label: "The Table", icon: "⏱" },
-        { href: "standings.html", label: "The Chase", icon: "🏆" },
-        { href: "schedule.html",  label: "Calendar",  icon: "🗓" }
+        { href: "index.html",     label: "Game",      icon: "♠" },
+        { href: "standings.html", label: "Standings", icon: "🏆" },
+        { href: "schedule.html",  label: "Schedule",  icon: "🗓" },
+        { href: "results.html",   label: "Results",   icon: "📋" },
+        { href: "players.html",   label: "Players",   icon: "👤" }
       ];
       return '<nav class="nav">' +
         '<a class="nav-brand" href="index.html"><span class="nav-suit">♠</span>' +
@@ -426,6 +427,13 @@
       const out = Array.from({ length: n }, () => []);
       seats.forEach((s, i) => out[i % n].push(s));
       return out;
+    },
+
+    /** Attach a listener only if the element exists on this page. */
+    on(id, ev, fn) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener(ev, fn);
+      return !!el;
     },
 
     esc(s) {

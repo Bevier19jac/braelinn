@@ -13,7 +13,7 @@ const say=(k,v)=>console.log('  '+k+': '+JSON.stringify(v));
  await c.route('**/gstatic.com/**',r=>r.abort());
  const p=await c.newPage();
  const errs=[]; p.on('pageerror',e=>errs.push(e.message));
- await p.goto('http://localhost:8921/game.html',{waitUntil:'networkidle'});
+ await p.goto('http://localhost:8921/index.html',{waitUntil:'networkidle'});
  await p.waitForTimeout(700);
  await p.evaluate(async()=>{
    sessionStorage.setItem('bpl_admin_ok','1'); localStorage.setItem('bpl_me','Jacob');
