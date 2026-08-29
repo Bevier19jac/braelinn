@@ -467,7 +467,7 @@ async function scenarios() {
 
 /* ------------------------------------------------------------- runner --- */
 (async () => {
-  const ITER = 5, PER = 10;
+  const ITER = Number(process.argv[2]) || 5, PER = Number(process.argv[3]) || 10;
   let n = 0;
   const stats = [];
 
@@ -603,6 +603,6 @@ async function scenarios() {
     });
     process.exit(1);
   } else {
-    console.log('\n✅ ALL 50 GAMES PASSED EVERY INVARIANT');
+    console.log('\n✅ ALL ' + n + ' GAMES PASSED EVERY INVARIANT');
   }
 })();

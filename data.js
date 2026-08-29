@@ -528,6 +528,20 @@ const BPL = {
    Escape hatch: set nextGame.pinDate = true to freeze it on a specific date
    (useful if you ever need to reopen a past game's RSVPs).
    ========================================================================== */
+/* If the calendar has run out, say so loudly in the console. A schedule with
+   no future date is not a code bug -- it is missing information -- and it is
+   exactly how an app ends up advertising last month's game as "next". */
+(function warnIfCalendarRanOut() {
+  const g = BPL.currentGame();
+  if (!g) { console.warn("[BPL] No games on the schedule at all."); return; }
+  const [y, m, d] = g.date.split("-").map(Number);
+  const now = new Date();
+  if (new Date(y, m - 1, d) < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+    console.warn("[BPL] The last scheduled game (" + g.date + ") has passed and nothing " +
+                 "follows it. Add the next date to LEAGUE.schedule in data.js.");
+  }
+})();
+
 (function autoRollActiveGame() {
   if (LEAGUE.nextGame.pinDate) return;
   const g = BPL.currentGame();

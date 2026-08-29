@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=9">
+<link rel="stylesheet" href="styles.css?v=10">
 </head>
 <body>
 
@@ -96,6 +96,18 @@
       <p class="tiny muted" style="margin:12px 0 0">
         RSVP isn't check-in — the seat draw runs off who actually turns up.
       </p>
+    </div>
+  </section>
+
+  <!-- ================================================= NOTHING SCHEDULED -->
+  <section id="noneSec" hidden>
+    <div class="card preseason">
+      <div class="ps-suits" aria-hidden="true">
+        <span class="b">♠</span><span class="r">♥</span><span class="r">♦</span><span class="b">♣</span>
+      </div>
+      <h3 id="noneTitle">No game on the calendar</h3>
+      <p id="noneBody"></p>
+      <div class="ps-meta" id="noneMeta"></div>
     </div>
   </section>
 
@@ -314,11 +326,11 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=9"></script>
-<script src="data.js?v=9"></script>
-<script src="app-core.js?v=9"></script>
-<script src="fx.js?v=9"></script>
-<script src="game-state.js?v=9"></script>
+<script src="firebase-config.js?v=10"></script>
+<script src="data.js?v=10"></script>
+<script src="app-core.js?v=10"></script>
+<script src="fx.js?v=10"></script>
+<script src="game-state.js?v=10"></script>
 <script>
 (function () {
   "use strict";
@@ -392,19 +404,55 @@
     return !!(st.seats && Array.isArray(st.seats.order) && st.seats.order.length);
   }
 
+  /**
+   * True when every scheduled game is behind us.
+   *
+   * This matters more than it looks. The app pins itself to the last event on
+   * the calendar, so with nothing further scheduled it would happily advertise
+   * a date that has already passed as "next game" — for weeks. Showing a stale
+   * date is worse than showing none: people plan around it.
+   */
+  function nothingScheduled() {
+    const g = BPL.currentGame();
+    if (!g) return true;
+    const [y, m, d] = g.date.split("-").map(Number);
+    const gameDay = new Date(y, m - 1, d);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return gameDay < today;
+  }
+
+  function renderNone() {
+    const last = BPL.currentGame();
+    document.getElementById("noneTitle").textContent =
+      "Season " + LEAGUE.season + " has no next game on the calendar";
+    document.getElementById("noneBody").textContent =
+      "The last scheduled game was " + (last ? BPL.fmtShort(last.date) : "a while ago") +
+      ". Nothing to RSVP to until the next date is added.";
+    const bits = [];
+    if (last) bits.push("Last played <b>" + UI.esc(BPL.fmtShort(last.date)) + "</b>");
+    bits.push("<b>" + LEAGUE.schedule.length + "</b> event" +
+              (LEAGUE.schedule.length === 1 ? "" : "s") + " on the calendar");
+    document.getElementById("noneMeta").innerHTML =
+      bits.map(b => "<span>" + b + "</span>").join("");
+  }
+
   function renderPhase() {
     const who   = me();
     const night = isGameNight();
+    const none  = !night && nothingScheduled();
     fillWhoSelect();
     document.getElementById("whoSec").hidden   = !!who;
-    document.getElementById("preSec").hidden   = !who || night;
+    document.getElementById("noneSec").hidden  = !who || !none;
+    document.getElementById("preSec").hidden   = !who || night || none;
     document.getElementById("nightSec").hidden = !who || !night;
+    if (none) renderNone();
     if (who) document.getElementById("whoSelect").value = who;
   }
 
   function renderRsvp() {
     const who = me();
-    if (!who || isGameNight()) return;
+    if (!who || isGameNight() || nothingScheduled()) return;
     const S = Game.state();
     const [y, m, d] = NG.date.split("-").map(Number);
     const dt = new Date(y, m - 1, d);
