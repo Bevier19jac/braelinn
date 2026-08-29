@@ -1,0 +1,11 @@
+Save the two generated textures into THIS folder, named exactly:
+
+    felt.png     the green table cloth
+    rail.png     the dark wood
+
+Then tell Claude they are here and it will resize, compress and wire
+them in. Nothing else in the app needs to change.
+
+Right now the table's felt and rail are drawn procedurally in CSS
+(SVG fractal noise), which costs no download and cannot fail if a
+CDN is down. These photographs are optional -- a swap, not a fix.

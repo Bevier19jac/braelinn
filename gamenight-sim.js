@@ -127,7 +127,7 @@ async function playNight(page, night, log) {
   page.removeAllListeners("pageerror");
   page.on("pageerror", e => errs.push(e.message));
 
-  await page.goto("http://localhost:8919/index.html", { waitUntil: "networkidle" });
+  await page.goto("http://localhost:8919/game.html", { waitUntil: "networkidle" });
   await page.waitForTimeout(250);
   await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch (e) {} });
 

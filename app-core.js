@@ -314,12 +314,14 @@
   const UI = {
     nav(active) {
       const links = [
-        { href: "index.html",     label: "Game",      icon: "♠" },
+        { href: "index.html",     label: "Tonight",   icon: "♠" },
+        { href: "game.html",      label: "The Table", icon: "⏱" },
         { href: "standings.html", label: "Standings", icon: "🏆" },
         { href: "schedule.html",  label: "Schedule",  icon: "🗓" },
         { href: "results.html",   label: "Results",   icon: "📋" },
         { href: "players.html",   label: "Players",   icon: "👤" }
       ];
+
       return '<nav class="nav">' +
         '<a class="nav-brand" href="index.html"><span class="nav-suit">♠</span>' +
         '<span><strong>Braelinn</strong><small>Poker League</small></span></a>' +

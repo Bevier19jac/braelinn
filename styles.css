@@ -1433,3 +1433,4 @@ body::after {
   display: grid; place-content: center; text-align: center; gap: 4px;
 }
 .bseat { z-index: 2; }
+header.hero[hidden], #rsvp[hidden], #seats[hidden], #noneSec[hidden] { display: none !important; }

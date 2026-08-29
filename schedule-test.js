@@ -8,7 +8,7 @@ const srv=http.createServer((q,r)=>{let p=decodeURIComponent(q.url.split('?')[0]
 const say=(k,v)=>console.log('  '+k+': '+JSON.stringify(v));
 const fails=[];
 const ok=(k,c,d)=>{ console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!==undefined?'  '+JSON.stringify(d):'')); if(!c) fails.push(k); };
-(async()=>{await new Promise(r=>srv.listen(8933,r));
+(async()=>{await new Promise(r=>srv.listen(8941,r));
  const b=await chromium.launch();
  for (const [label, iso, expectRsvp] of [
    ['the day before',      '2026-09-02T12:00:00', true ],
@@ -25,13 +25,13 @@ const ok=(k,c,d)=>{ console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!==undefined?'  
      Date=D;
    }`);
    const p=await c.newPage();
-   await p.goto('http://localhost:8933/index.html',{waitUntil:'networkidle'});
+   await p.goto('http://localhost:8941/index.html',{waitUntil:'networkidle'});
    await p.evaluate(()=>{try{localStorage.setItem('bpl_me','Aaron')}catch(e){}});
    await p.reload({waitUntil:'networkidle'}); await p.waitForTimeout(700);
    const st = await p.evaluate(()=>({
-     rsvp: !document.getElementById('preSec').hidden,
+     rsvp: !!document.querySelector('#rsvp') && !document.querySelector('#rsvp').hidden,
      none: !document.getElementById('noneSec').hidden,
-     shownDate: (document.getElementById('rsvpDate')||{}).textContent||'',
+     shownDate: (document.getElementById('hcWhen')||{}).textContent||'',
      noneMsg: (document.getElementById('noneBody')||{}).textContent||''
    }));
    console.log('\n-- ' + label + ' --');
