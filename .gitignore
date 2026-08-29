@@ -4,3 +4,7 @@ Thumbs.db
 node_modules/
 .vscode/
 birdseye.png
+
+# scratch used to move files onto this machine - not part of the app
+_transfer/
+_locks/

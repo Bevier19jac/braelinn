@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate firebase-rules.min.json from firebase-rules.json.
+"""Generate FIREBASE-RULES-PASTE-THIS.json from firebase-rules.json.
 
 Firebase rejects the _comment keys used to document the rules, so the
 publishable copy is the documented tree with comments stripped. It is
-GENERATED -- never edit firebase-rules.min.json by hand, or the two
+GENERATED -- never edit FIREBASE-RULES-PASTE-THIS.json by hand, or the two
 drift and you publish something you did not review.
 
     python3 make-rules.py
@@ -22,5 +22,5 @@ def strip(o):
 
 out = json.dumps(strip(full), separators=(",", ":"))
 json.loads(out)                      # never write something that will not parse
-(here / "firebase-rules.min.json").write_text(out + "\n")
-print("wrote firebase-rules.min.json (%d bytes)" % len(out))
+(here / "FIREBASE-RULES-PASTE-THIS.json").write_text(out + "\n")
+print("wrote FIREBASE-RULES-PASTE-THIS.json (%d bytes)" % len(out))

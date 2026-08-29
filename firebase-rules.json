@@ -1,7 +1,10 @@
 {
   "_comment": [
     "BRAELINN POKER LEAGUE — Firebase Realtime Database rules.",
-    "Paste this into Firebase Console -> Realtime Database -> Rules -> Publish.",
+    "DO NOT PASTE THIS FILE INTO FIREBASE. It has _comment keys, which",
+    "Firebase rejects with: expected 'rules' property. Paste the generated",
+    "file FIREBASE-RULES-PASTE-THIS.json instead. Edit THIS file, then run",
+    "python3 make-rules.py to regenerate the one you paste.",
     "Read SECURITY.md first. Short version: these rules protect your tournament",
     "HISTORY, which is the only irreplaceable data. They cannot distinguish the",
     "host from a player, because that requires server-side verification that a",
