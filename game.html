@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
 
@@ -301,11 +301,11 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=13"></script>
-<script src="data.js?v=13"></script>
-<script src="app-core.js?v=13"></script>
-<script src="fx.js?v=13"></script>
-<script src="game-state.js?v=13"></script>
+<script src="firebase-config.js?v=14"></script>
+<script src="data.js?v=14"></script>
+<script src="app-core.js?v=14"></script>
+<script src="fx.js?v=14"></script>
+<script src="game-state.js?v=14"></script>
 <script>
 (function () {
   "use strict";
@@ -1034,7 +1034,14 @@
   });
   UI.on("btnSplits", "click", () => {
     const raw = document.getElementById("cfgSplits").value.split(/[^0-9.]+/);
-    Game.setSplits(raw).then(() => UI.toast("Payouts set", "ok"), e => UI.toast(e.message, "bad"));
+    /* An empty or all-zero entry CLEARS the override rather than setting one.
+       Saying "Payouts set" there would be a lie -- it reverts to the
+       automatic table, which is the opposite of what was asked for. */
+    const usable = raw.map(Number).filter(n => isFinite(n) && n > 0);
+    Game.setSplits(raw).then(
+      () => UI.toast(usable.length ? "Payouts set — " + usable.length + " paid"
+                                   : "Cleared — back to the automatic table", "ok"),
+      e => UI.toast(e.message, "bad"));
   });
   UI.on("btnSplitsReset", "click", () => {
     Game.setSplits([]).then(() => UI.toast("Back to the automatic table", "ok"));
@@ -1062,12 +1069,23 @@
     const S = Game.state();
     const rsvpIn = Game.rsvpIn();
     const notIn = rsvpIn.filter(n => !S.players[n]);
+    const inNow = Game.entrants().sort();
 
     document.getElementById("ciHint").textContent =
-      Game.fieldSize() + " in · " + notIn.length + " expected";
+      inNow.length + " in · " + notIn.length + " expected";
 
+    /* Two labelled groups, not one long list.
+       Removing someone who RSVP'd "in" does not take their name off the
+       screen -- they drop back to the expected list one line below, which
+       looked exactly like nothing had happened. Headed groups make the move
+       visible: the count above them changes and the row crosses the divider. */
     const rows = [];
-    Game.entrants().sort().forEach(n => {
+
+    rows.push('<div class="ci-head"><b>Checked in</b><span>' + inNow.length + '</span></div>');
+    if (!inNow.length) {
+      rows.push('<p class="empty tiny" style="margin:2px 0 10px">Nobody checked in yet.</p>');
+    }
+    inNow.forEach(n => {
       const p = S.players[n];
       rows.push('<div class="trk-row">' + UI.avatar(n, "sm") +
         '<span class="nm">' + UI.esc(n) +
@@ -1075,14 +1093,18 @@
         '</span><span class="badge in">Checked in</span>' +
         '<button class="btn btn-sm btn-danger" data-uncheck="' + UI.esc(n) + '">Remove</button></div>');
     });
+
+    rows.push('<div class="ci-head"><b>Expected, not here yet</b><span>' + notIn.length + '</span></div>');
+    if (!notIn.length) {
+      rows.push('<p class="empty tiny" style="margin:2px 0 0">Everyone who RSVP\'d In is checked in.</p>');
+    }
     notIn.forEach(n => {
       rows.push('<div class="trk-row out">' + UI.avatar(n, "sm") +
         '<span class="nm">' + UI.esc(n) + '<small>RSVP\'d In</small></span>' +
         '<button class="btn btn-sm btn-primary" data-check="' + UI.esc(n) + '">Check in</button></div>');
     });
 
-    document.getElementById("checkinList").innerHTML =
-      rows.join("") || '<p class="empty tiny">Nobody has RSVP\'d In yet.</p>';
+    document.getElementById("checkinList").innerHTML = rows.join("");
 
     document.getElementById("btnCheckInAll").disabled = !notIn.length;
     document.getElementById("btnCheckInAll").textContent = notIn.length
@@ -1090,13 +1112,28 @@
       : "Everyone who RSVP'd is in";
   }
 
+
   UI.on("checkinList", "click", e => {
     const chk = e.target.closest("button[data-check]");
     const unc = e.target.closest("button[data-uncheck]");
     if (!(chk || unc) || !Admin.require()) return;
     if (chk) Game.checkIn(chk.dataset.check, { late: Game.clock().started }).then(render);
-    if (unc) UI.confirm("Remove " + unc.dataset.uncheck + "?", "They'll come off tonight's field.", "Remove")
-      .then(ok => { if (ok) Game.undoCheckIn(unc.dataset.uncheck).then(render); });
+    if (unc) {
+      const n = unc.dataset.uncheck;
+      UI.confirm("Remove " + n + "?", "They'll come off tonight's field.", "Remove")
+        .then(ok => {
+          if (!ok) return;
+          Game.undoCheckIn(n).then(() => {
+            render();
+            /* Say where they went. If they RSVP'd In they are still on screen,
+               just in the other group, and "Removed" alone reads as a lie. */
+            const stillExpected = Game.rsvpIn().indexOf(n) !== -1;
+            UI.toast(stillExpected
+              ? n + " removed — back in the expected list below"
+              : n + " removed from tonight", "ok");
+          });
+        });
+    }
   });
 
   document.getElementById("btnCheckInAll").onclick = () => {

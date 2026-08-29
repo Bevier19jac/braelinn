@@ -1448,3 +1448,20 @@ body::after {
 }
 .bseat { z-index: 2; }
 header.hero[hidden], #rsvp[hidden], #seats[hidden], #noneSec[hidden] { display: none !important; }
+
+/* Check-in is two groups, not one list — so removing somebody visibly
+   moves them across a divider instead of looking like nothing happened. */
+.ci-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 14px 0 6px; padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+}
+.ci-head:first-child { margin-top: 2px; }
+.ci-head b {
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--brass);
+}
+.ci-head span {
+  font-family: var(--mono); font-size: 12px; color: var(--ink-mute);
+  background: #ffffff08; border: 1px solid var(--line);
+  border-radius: 999px; padding: 1px 9px;
+}
