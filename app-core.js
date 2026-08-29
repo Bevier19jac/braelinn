@@ -255,6 +255,17 @@
       DB.on("config/pin", val => {
         if (val) Admin.pin = String(val);
         else DB.set("config/pin", Admin.pin);
+
+        /* A PIN saved as a NUMBER in the Firebase console silently loses any
+           leading zero -- 0221 is stored as 221 -- and the host then cannot
+           unlock anything on game night. The app copes, but say so loudly so
+           it gets fixed while there is time. */
+        if (val !== null && val !== undefined && typeof val !== "string") {
+          console.warn("[BPL] The host PIN is stored as a " + typeof val +
+            ", not text. It works, but a leading zero would have been lost when " +
+            "it was saved. Re-enter it in the Firebase console WITH quotes: \"1234\".");
+        }
+
         Admin.usingDefault = String(Admin.pin).trim() === "1234";
         if (Admin.usingDefault) {
           console.warn("[BPL] Host PIN is still the default 1234 -- anyone with the link can unlock host controls. " +
