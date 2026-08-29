@@ -133,7 +133,7 @@ const LEAGUE = {
     { name: "Mark",       fullName: "Mark Fischer",     events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
     { name: "Alieu",      fullName: "Alieu Lette",      events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
     { name: "Jake",       fullName: "Jake Westfall",    events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
-    { name: "Sprayberry", fullName: "Sprayberry",       events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" }
+    { name: "Sprayberry", fullName: "Tyler Sprayberry", events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" }
   ],
 
   /* --------------------------------------------------------------------------
