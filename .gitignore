@@ -8,3 +8,8 @@ birdseye.png
 # scratch used to move files onto this machine - not part of the app
 _transfer/
 _locks/
+
+# 7MB source textures stay local; art/*.jpg are the shipped versions
+art/*.png
+art/PUT-TEXTURES-HERE.txt
+_x/

@@ -1392,8 +1392,11 @@ body::after {
 
 /* ============================================================================
    THE TABLE, AS A MATERIAL
-   Felt and rail are generated with SVG fractal noise rather than shipped as
-   images: no download, no CDN, no weight, and it stays sharp at any size.
+
+   Photographic felt and walnut, generated for this app and compressed to
+   27KB the pair. They sit ON TOP of the gradients rather than replacing
+   them: if an image ever fails to load, the table still renders as the
+   lit oval it was before, not as a grey hole.
    ========================================================================== */
 
 .birdtable { isolation: isolate; }
@@ -1403,10 +1406,11 @@ body::after {
   content: ""; position: absolute; inset: 23.5% 17%;
   border-radius: 50% / 46%;
   background:
-    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22220%22%20height%3D%22220%22%3E%3Cfilter%20id%3D%22n%22%20x%3D%220%22%20y%3D%220%22%20width%3D%22100%25%22%20height%3D%22100%25%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.035%22%20numOctaves%3D%222%22%20seed%3D%2211%22%20stitchTiles%3D%22stitch%22%2F%3E%3CfeColorMatrix%20type%3D%22saturate%22%20values%3D%220%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20filter%3D%22url%28%23n%29%22%20opacity%3D%220.55%22%2F%3E%3C%2Fsvg%3E"),
+    url("art/rail.jpg?v=1"),
     linear-gradient(160deg, #6b4e28 0%, #3f2c14 38%, #5c4222 62%, #2f1f0e 100%);
+  background-size: 190% 190%, cover;
+  background-position: center, center;
   background-blend-mode: overlay, normal;
-  background-size: 300px 300px, cover;
   box-shadow:
     inset 0 2px 3px rgba(255,255,255,.16),
     inset 0 -3px 7px rgba(0,0,0,.5),
@@ -1417,11 +1421,12 @@ body::after {
   position: absolute; inset: 27.5% 21.5%; z-index: 1;
   border-radius: 50% / 46%;
   background:
-    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22220%22%20height%3D%22220%22%3E%3Cfilter%20id%3D%22n%22%20x%3D%220%22%20y%3D%220%22%20width%3D%22100%25%22%20height%3D%22100%25%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.9%22%20numOctaves%3D%224%22%20seed%3D%227%22%20stitchTiles%3D%22stitch%22%2F%3E%3CfeColorMatrix%20type%3D%22saturate%22%20values%3D%220%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20filter%3D%22url%28%23n%29%22%20opacity%3D%220.42%22%2F%3E%3C%2Fsvg%3E"),
-    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22220%22%20height%3D%22220%22%3E%3Cfilter%20id%3D%22n%22%20x%3D%220%22%20y%3D%220%22%20width%3D%22100%25%22%20height%3D%22100%25%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.16%22%20numOctaves%3D%223%22%20seed%3D%223%22%20stitchTiles%3D%22stitch%22%2F%3E%3CfeColorMatrix%20type%3D%22saturate%22%20values%3D%220%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%22220%22%20height%3D%22220%22%20filter%3D%22url%28%23n%29%22%20opacity%3D%220.3%22%2F%3E%3C%2Fsvg%3E"),
-    radial-gradient(115% 125% at 50% 28%, #1f6044 0%, #124532 46%, #0a2a1e 100%);
-  background-blend-mode: overlay, soft-light, normal;
-  background-size: 110px 110px, 420px 420px, cover;
+    url("art/felt.jpg?v=1"),
+    radial-gradient(115% 128% at 50% 26%, #27735170 0%, #1a5a3e 40%, #0d3325 100%),
+    radial-gradient(120% 130% at 50% 28%, #23684b 0%, #164e37 46%, #0b2e21 100%);
+  background-size: 130% 130%, cover, cover;
+  background-position: center, center, center;
+  background-blend-mode: soft-light, screen, normal;
   box-shadow:
     inset 0 20px 50px rgba(0,0,0,.5),
     inset 0 -10px 30px rgba(0,0,0,.38);
