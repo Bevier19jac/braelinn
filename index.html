@@ -746,7 +746,7 @@
               ' <b>' + names.length + '</b></div>' +
               '<div class="wi-list">' + names.map(n =>
                 '<div class="wi-row' + (n === who ? " isme" : "") + '">' +
-                  UI.avatar(n, "sm") + '<span>' + UI.esc(n) +
+                  UI.avatar(n, "sm") + '<span class="wi-nm">' + UI.esc(n) +
                   (n === who ? ' <em>you</em>' : '') + '</span>' +
                   (livePlayers[n] ? '<span class="wi-ok">✓ here</span>' : '') +
                 '</div>').join("") + '</div>';

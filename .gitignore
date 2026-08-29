@@ -5,3 +5,6 @@ node_modules/
 .vscode/
 birdseye.png
 home-restored.png
+
+# Transfer scratch — never part of the site.
+_x/

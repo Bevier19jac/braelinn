@@ -1615,7 +1615,10 @@ body.gated { overflow: hidden; }
   background: #0e241980; border: 1px solid var(--line-soft);
   font-size: 14px; font-weight: 600;
 }
-.wi-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Scoped to the name, not every span -- an unscoped flex:1 caught the avatar
+   and stretched it into an ellipse. */
+.wi-row .avatar { flex: 0 0 auto; }
+.wi-row .wi-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wi-row em { font-style: normal; font-size: 11px; color: var(--brass); font-weight: 400; }
 .wi-row.isme { border-color: var(--brass-dim); }
-.wi-ok { flex: 0 0 auto !important; font-size: 11px; color: var(--ok); font-weight: 600; }
+.wi-ok { flex: 0 0 auto; font-size: 11px; color: var(--ok); font-weight: 600; }
