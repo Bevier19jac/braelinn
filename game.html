@@ -54,7 +54,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Playfair+Display:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 
@@ -262,11 +262,11 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="firebase-config.js?v=4"></script>
-<script src="data.js?v=4"></script>
-<script src="app-core.js?v=4"></script>
-<script src="fx.js?v=4"></script>
-<script src="game-state.js?v=4"></script>
+<script src="firebase-config.js?v=5"></script>
+<script src="data.js?v=5"></script>
+<script src="app-core.js?v=5"></script>
+<script src="fx.js?v=5"></script>
+<script src="game-state.js?v=5"></script>
 <script>
 (function () {
   "use strict";
@@ -664,7 +664,9 @@
     document.getElementById("tableOut").innerHTML =
       '<div class="seat-tables ' + (tables.length > 1 ? "multi" : "") + '">' +
       tables.map((t, ti) =>
-        '<div class="seat-table livetbl" data-t="' + (ti % 4) + '"><h3>Table ' + (ti + 1) + '</h3>' +
+        '<div class="seat-table livetbl" data-t="' + (ti % 4) + '">' +
+        '<h3><button class="tblbtn" data-birdseye="' + ti + '" type="button">Table ' + (ti + 1) +
+        ' <span aria-hidden="true">⤢</span></button></h3>' +
         t.map((n, si) => {
           const p    = S.players[n] || {};
           const dead = p.status === "out";
@@ -699,9 +701,92 @@
 
   /* Delegated so it survives every re-render. */
   document.getElementById("tableOut").addEventListener("click", e => {
+    const bird = e.target.closest("[data-birdseye]");
+    if (bird) return openBirdsEye(Number(bird.dataset.birdseye));
     const row = e.target.closest("[data-stack]");
     if (row) openStackSheet(row.dataset.stack);
   });
+
+  /* ---------------------------------------------------------------------
+     BIRD'S EYE — the table as you'd see it standing over it.
+
+     Seats sit around an oval in dealt order, and seat 1 is placed at the
+     bottom centre so the view matches where you're actually sitting. It is
+     a view, not a source of truth: it reads the same state as the list and
+     writes through the same guarded setStack.
+     ------------------------------------------------------------------- */
+  function openBirdsEye(ti) {
+    const wrap = document.createElement("div");
+    wrap.className = "sheet-wrap birdwrap";
+    document.body.appendChild(wrap);
+
+    function paint() {
+      const S = Game.state();
+      const s = S.seats;
+      if (!s || !Array.isArray(s.order)) { wrap.remove(); return; }
+      const tables = UI.tables(s.order, s.tables);
+      const seatNames = tables[ti];
+      if (!seatNames) { wrap.remove(); return; }
+
+      const who  = me();
+      const host = Admin.isUnlocked();
+      const bb   = Game.currentBB();
+      const n    = seatNames.length;
+
+      const seats = seatNames.map((name, i) => {
+        /* Start at the bottom centre and run clockwise, like a real table. */
+        const a = (Math.PI / 2) + (i / n) * Math.PI * 2;
+        const x = 50 + 41 * Math.cos(a);
+        const y = 50 + 39 * Math.sin(a);
+        const p = S.players[name] || {};
+        const dead  = p.status === "out";
+        const mine  = who === name;
+        const stack = p.stack || 0;
+        const editable = (mine || host) && !dead;
+        return '<div class="bseat' + (dead ? " dead" : "") + (mine ? " mine" : "") + '"' +
+          ' style="left:' + x.toFixed(2) + '%;top:' + y.toFixed(2) + '%"' +
+          (editable ? ' data-stack="' + UI.esc(name) + '" role="button" tabindex="0"' : '') + '>' +
+          '<span class="bs-seat">' + (i + 1) + '</span>' +
+          UI.avatar(name, "sm") +
+          '<span class="bs-nm">' + UI.esc(name) + '</span>' +
+          '<span class="bs-st">' + (dead ? "OUT"
+              : stack ? BPL.chips(stack) + (bb ? '<span class="bs-bb">' + (stack / bb).toFixed(0) + ' BB</span>' : '')
+              : (editable ? "tap to add" : "—")) + '</span>' +
+          '</div>';
+      }).join("");
+
+      wrap.innerHTML =
+        '<div class="birdsheet">' +
+          '<div class="bird-head">' +
+            '<h3>Table ' + (ti + 1) + '</h3>' +
+            '<button class="btn btn-sm" data-no type="button">Close</button>' +
+          '</div>' +
+          '<div class="birdtable"><div class="felt">' +
+            '<span class="felt-mark" aria-hidden="true">♠</span>' +
+            '<span class="felt-sub">' + n + ' seated' +
+              (bb ? ' · blinds ' + BPL.chips(Math.round(bb / 2)) + '/' + BPL.chips(bb) : '') +
+            '</span>' +
+          '</div>' + seats + '</div>' +
+          '<p class="tiny muted" style="margin:10px 0 0;text-align:center">' +
+            (who ? 'Tap your seat to update your count.'
+                 : 'Tap “' + UI.esc("who am I") + '” on the table list first so it knows which seat is yours.') +
+          '</p>' +
+        '</div>';
+    }
+
+    paint();
+    const off = Game.subscribe(paint);          // stays live while it's open
+    const close = () => { try { off && off(); } catch (e) {} wrap.remove(); };
+
+    wrap.addEventListener("click", e => {
+      if (e.target === wrap || e.target.closest("[data-no]")) return close();
+      const seat = e.target.closest("[data-stack]");
+      if (seat) openStackSheet(seat.dataset.stack);
+    });
+    window.addEventListener("keydown", function esc(ev) {
+      if (ev.key === "Escape") { close(); window.removeEventListener("keydown", esc); }
+    });
+  }
   document.getElementById("meHint").addEventListener("click", e => {
     if (e.target.id === "btnIamMe") pickMe();
     if (e.target.id === "btnNotMe") { localStorage.removeItem(ME_KEY); render(); }

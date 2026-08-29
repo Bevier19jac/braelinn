@@ -107,7 +107,19 @@
     Structure: Structure,
 
     /* -------------------------------------------------------- lifecycle */
-    subscribe(fn) { S._subs.push(fn); fn(S); },
+    /**
+     * Subscribe to state changes. Returns an unsubscribe function -- without
+     * one, anything transient (a sheet, an overlay) keeps repainting after it
+     * has been removed from the page, forever.
+     */
+    subscribe(fn) {
+      S._subs.push(fn);
+      fn(S);
+      return function () {
+        const i = S._subs.indexOf(fn);
+        if (i !== -1) S._subs.splice(i, 1);
+      };
+    },
 
     start() {
       DB.on(BASE + "/status",  v => { S.status  = v || "checkin"; emit(); });
