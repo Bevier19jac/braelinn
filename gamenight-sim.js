@@ -127,9 +127,13 @@ async function playNight(page, night, log) {
   page.removeAllListeners("pageerror");
   page.on("pageerror", e => errs.push(e.message));
 
+  /* The Table sends anyone who hasn't signed in to the sign-in screen, so
+     say who we are before the first load or Game is nowhere to be found. */
+  await page.goto("http://localhost:8919/index.html", { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => { try { localStorage.setItem("bpl_me", "Nate"); } catch (e) {} });
   await page.goto("http://localhost:8919/game.html", { waitUntil: "networkidle" });
   await page.waitForTimeout(250);
-  await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); } catch (e) {} });
+  await page.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('bpl_me','Nate'); } catch (e) {} });
 
   await page.evaluate(async ns => {
     sessionStorage.setItem("bpl_admin_ok", "1");

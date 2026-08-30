@@ -237,6 +237,18 @@
             <button class="btn btn-danger" id="btnClearSeats">Clear</button>
           </div>
           <p class="tiny muted" style="margin:0" id="seatNote"></p>
+
+          <!-- Breaking a table mid-game. Three to two, two to one: one tap,
+               and it re-shuffles the survivors so nobody keeps a seat just
+               because of where they were sitting. -->
+          <div id="consolidateBox" class="consol mt" hidden>
+            <div class="consol-head">
+              <b id="consolTitle"></b>
+              <small id="consolSub"></small>
+            </div>
+            <div class="consol-btns" id="consolBtns"></div>
+          </div>
+
           <div id="seatOut" class="mt"></div>
         </div>
       </section>
@@ -667,12 +679,15 @@
 
     const act = Game.active().length;
     const seats = S.seats;
-    if (seats && seats.tables > 1 && act > 1 && act <= seats.tables * 5) {
+    if (Game.shouldConsolidate()) {
+      const want = Game.idealTables(act);
       items.push({
         kind: "info",
-        title: act + " players left across " + seats.tables + " tables",
-        sub: "Tables are getting short — consolidating is available.",
-        actions: '<button class="btn btn-sm btn-primary" data-act="consolidate">Consolidate</button>'
+        title: act + " left across " + seats.tables + " tables — time to break one",
+        sub: "They fit on " + want + (want === 1 ? " table" : " tables") +
+             ". Redrawing re-shuffles everyone still in.",
+        actions: '<button class="btn btn-sm btn-primary" data-act="consolidate" data-tc="' + want +
+                 '">Redraw to ' + want + (want === 1 ? " table" : " tables") + '</button>'
       });
     }
 
@@ -708,21 +723,10 @@
       .then(place => { FX.eliminated(b.dataset.n, place); render(); });
     if (a === "dismiss")    Game.dismissReport(b.dataset.id).then(render);
     if (a === "gotoCheckin") {
-      document.querySelector('.tabs button[data-tab="host"]').click();
+      UI.tab("host");
       document.getElementById("checkinList").scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    if (a === "consolidate") {
-      const n = Game.active().length;
-      const tc = n <= 10 ? 1 : 2;
-      const w = Game.drawSeats(tc);
-      w.catch(err => UI.toast(err.message, "bad"));
-      Promise.all([w.catch(() => null), FX.shuffle(700)]).then(([ok]) => {
-        if (ok === null) return;
-        UI.toast("Consolidated to " + tc + (tc === 1 ? " table" : " tables"), "ok");
-        render();
-        FX.dealSeats(document.getElementById("seatOut"));
-      });
-    }
+    if (a === "consolidate") doConsolidate(Number(b.dataset.tc) || Game.idealTables());
     if (a === "finalize") doFinalize();
   });
 
@@ -1325,6 +1329,78 @@
       .then(ok => { if (ok) Game.timerReset().then(render); });
   };
 
+  /* ------------------------------------------------------ CONSOLIDATION
+
+     Three tables to two, two to one. One tap. The survivors get re-shuffled
+     rather than shunted, so a consolidation is as random as the opening
+     draw and nobody keeps position by accident.
+     ------------------------------------------------------------------- */
+  function doConsolidate(tc) {
+    if (!Admin.require()) return;
+    const alive = Game.active().length;
+    const label = tc + (tc === 1 ? " table" : " tables");
+    UI.confirm(
+      "Redraw " + alive + " players onto " + label + "?",
+      "Everyone still in gets a new seat. Busted players are left out. " +
+      "Chip counts, rebuys and the clock are untouched.",
+      "Redraw"
+    ).then(go => {
+      if (!go) return;
+      const write = Game.consolidate(tc);
+      write.catch(err => UI.toast(err.message, "bad"));
+      Promise.all([write.catch(() => null), FX.shuffle(700)]).then(([res]) => {
+        if (res === null) return;
+        UI.toast("Redrawn onto " + label, "ok");
+        UI.tab("table");
+        render();
+        FX.dealSeats(document.getElementById("seatOut"));
+      });
+    });
+  }
+
+  function renderConsolidate() {
+    const box = document.getElementById("consolidateBox");
+    if (!box) return;
+    const S = Game.state();
+    const seats = S.seats;
+    const alive = Game.active().length;
+
+    /* Nothing to break up before the draw, or once one table is left. */
+    if (!seats || !seats.tables || alive < 2 || (seats.tables === 1 && alive > Game.MAX_PER_TABLE)) {
+      box.hidden = true;
+      return;
+    }
+
+    const want = Game.idealTables(alive);
+    const per = (alive / seats.tables);
+    box.hidden = false;
+    document.getElementById("consolTitle").textContent =
+      alive + " still in across " + seats.tables + (seats.tables === 1 ? " table" : " tables");
+    document.getElementById("consolSub").textContent =
+      want < seats.tables
+        ? "That's " + per.toFixed(1) + " a table — they fit on " + want + "."
+        : "No need to break a table yet.";
+
+    /* Only ever offer FEWER tables than are running. Tournaments break
+       tables, they never split them, and offering "4 tables" to nine
+       survivors is an invitation to a mistake at 1am. */
+    const opts = [];
+    for (let tc = 1; tc <= seats.tables; tc++) {
+      if (alive / tc >= 2) opts.push(tc);
+    }
+    document.getElementById("consolBtns").innerHTML = opts.map(tc =>
+      '<button class="btn btn-sm' + (tc === want ? " btn-primary" : "") +
+      '" data-tc="' + tc + '"' + (tc === seats.tables ? " disabled" : "") + '>' +
+      (tc === seats.tables ? "On " + tc : "Redraw to " + tc) +
+      (tc === 1 ? " table" : " tables") + '</button>').join("");
+  }
+
+  UI.on("consolBtns", "click", e => {
+    const b = e.target.closest("button[data-tc]");
+    if (!b || b.disabled) return;
+    doConsolidate(Number(b.dataset.tc));
+  });
+
   document.getElementById("btnDraw").onclick = () => {
     if (!Admin.require()) return;
     const tc = Number(document.getElementById("tableCount").value) || 1;
@@ -1334,7 +1410,7 @@
     write.catch(err => UI.toast(err.message, "bad"));
     Promise.all([write.catch(() => null), FX.shuffle(900)]).then(([ok]) => {
       if (ok === null) return;
-      document.querySelector('.tabs button[data-tab="table"]').click();
+      UI.tab("table");
       render();
       FX.dealSeats(document.getElementById("seatOut"));
     });
@@ -1401,6 +1477,7 @@
       renderMe();
       renderPlayers();
       renderSeats();
+      renderConsolidate();
       renderMoney();
       renderMoneyCfg();
       renderCheckin();

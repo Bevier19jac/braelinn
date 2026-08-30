@@ -451,6 +451,19 @@
       return out;
     },
 
+    /**
+     * Switch to a Master Control tab, if this page has tabs at all.
+     *
+     * The unguarded querySelector(...).click() behind this threw on a page
+     * where the drawer had not been opened -- and it threw in the middle of
+     * the seat draw, after the write but before the felt repainted.
+     */
+    tab(name) {
+      const b = document.querySelector('.tabs button[data-tab="' + name + '"]');
+      if (b) b.click();
+      return !!b;
+    },
+
     /** Attach a listener only if the element exists on this page. */
     on(id, ev, fn) {
       const el = document.getElementById(id);

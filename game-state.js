@@ -530,6 +530,14 @@
           name + " has already used their top-up for tonight" +
           (cap === 1 ? " (one per player)" : " (" + cap + " per player)") + "."));
       }
+      /* The buy-in window shuts at the break after 300/600. The host can
+         still push one through -- somebody handing over cash as the break
+         is called is a real thing -- but it has to be a decision, not a
+         mis-tap at level 8. */
+      if (!override && !Game.rebuyWindowOpen()) {
+        return Promise.reject(new Error(
+          "The top-up window closed at the break after 300/600."));
+      }
       const wasOut = p.status === "out";
       return DB.save("rebuy for " + name,
         () => DB.update(BASE + "/players/" + name, {
@@ -592,6 +600,48 @@
       return DB.save("draw seats", () => DB.set(BASE + "/seats", {
         tables: tc, order: UI.shuffle(pool), drawnAt: DB.now()
       }));
+    },
+
+    /**
+     * How many tables SHOULD be running, given who is still alive.
+     *
+     * Standard practice: break a table as soon as the survivors fit on fewer
+     * without anyone sitting more than nine-handed. Nine, not ten, because a
+     * table that fills to exactly ten has to break again after the next bust
+     * -- and moving everyone twice in ten minutes is how a night gets slow.
+     */
+    MAX_PER_TABLE: 9,
+
+    idealTables(n) {
+      const alive = typeof n === "number" ? n : Game.active().length;
+      if (alive < 2) return 1;
+      return Math.max(1, Math.ceil(alive / Game.MAX_PER_TABLE));
+    },
+
+    /** True when the survivors would fit on fewer tables than are running. */
+    shouldConsolidate() {
+      const s = S.seats;
+      if (!s || !s.tables || s.tables < 2) return false;
+      const alive = Game.active().length;
+      if (alive < 2) return false;
+      return Game.idealTables(alive) < s.tables;
+    },
+
+    /**
+     * Re-draw the survivors across `tables`. Same shuffle as the opening
+     * draw, so a consolidation is as random as the night started -- nobody
+     * inherits a seat because of where they happened to be sitting.
+     */
+    consolidate(tables) {
+      const alive = Game.active();
+      if (alive.length < 2) return Promise.reject(new Error("Not enough players left to redraw"));
+      const tc = Math.max(1, tables || Game.idealTables(alive.length));
+      if (alive.length / tc < 2) {
+        return Promise.reject(new Error("Too many tables for " + alive.length + " players"));
+      }
+      return DB.save("redraw seats", () => DB.set(BASE + "/seats", {
+        tables: tc, order: UI.shuffle(alive), drawnAt: DB.now()
+      })).then(() => tc);
     },
 
     clearSeats() {

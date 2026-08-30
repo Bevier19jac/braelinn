@@ -1622,3 +1622,17 @@ body.gated { overflow: hidden; }
 .wi-row em { font-style: normal; font-size: 11px; color: var(--brass); font-weight: 400; }
 .wi-row.isme { border-color: var(--brass-dim); }
 .wi-ok { flex: 0 0 auto; font-size: 11px; color: var(--ok); font-weight: 600; }
+
+/* ------------------------------------------------------- CONSOLIDATION --
+   Breaking a table, three to two or two to one. Lives inside Seating in
+   Master Control, because that is where a host looks for it. */
+.consol {
+  border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: #0b1e1580; padding: 12px;
+}
+.consol-head { display: flex; flex-direction: column; line-height: 1.3; margin-bottom: 10px; }
+.consol-head b { font-size: 14px; }
+.consol-head small { font-size: 12px; color: var(--ink-mute); }
+.consol-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.consol-btns .btn { flex: 1 1 auto; min-width: 116px; }
+.consol-btns .btn[disabled] { opacity: .45; cursor: default; }

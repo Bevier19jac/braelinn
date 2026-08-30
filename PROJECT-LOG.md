@@ -113,6 +113,48 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 30 Aug — breaking tables, the buy-in cutoff, and a full dress rehearsal
+
+Jacob: *"i would like there to be an easy way to redraw seats when converging
+to two from three or one from two"*, *"after 300/600 is the first break and
+buyin cutoff"*, and *"i just want to make sure that people can easily rsvp and
+me or nate can easily confirm and then draw seats at 830"*.
+
+- **Consolidation is a first-class control now**, in Master Control -> Seating.
+  It reads "18 still in across 3 tables - that's 6.0 a table, they fit on 2"
+  and offers a button per table count, with the recommendation highlighted.
+  `Game.idealTables()` = ceil(alive / 9): nine, not ten, because a table
+  filled to exactly ten has to break again after the next bust.
+- **It only ever offers FEWER tables than are running.** Tournaments break
+  tables, they never split them, and offering "4 tables" to nine survivors is
+  an invitation to a mistake at 1am.
+- A redraw **re-shuffles** the survivors rather than shunting them, so a
+  consolidation is as random as the opening draw. Chips, top-ups and the clock
+  are untouched.
+- The queue prompt now fires when it is actually time (survivors fit on fewer)
+  rather than at an arbitrary five-a-table, and names the number.
+- **The buy-in cutoff now holds against a mis-tap.** The break after 300/600
+  already closed the window for players; the HOST could still add a top-up at
+  level 8 by accident. `addRebuy` refuses past the break and the existing
+  "Add it anyway?" override carries it through when Nate means it.
+- `UI.tab(name)` replaced three unguarded `querySelector(...).click()` calls.
+  One of them threw mid-seat-draw on a page where the drawer had not been
+  opened - after the write, before the felt repainted.
+
+**DRESS REHEARSAL — `dress-rehearsal.js`.** Forty complete game nights, every
+step a real click on the real page: a player signs in and taps their RSVP,
+Nate signs in with the passcode, checks everyone in, removes the no-shows,
+adds a walk-in, draws the seats, starts the clock, takes top-ups, walks the
+clock past the break, plays it out busting at random, breaks tables as the
+field shrinks, and finalizes. After each night it re-checks that nobody was
+lost or seated twice, no busted player kept a seat, places run 1..N, the field
+size matches, and the season standings moved by exactly the points awarded.
+
+    40 nights, fields of 8-28
+    56 consolidations, 120 top-ups, 40 post-break top-ups blocked, 13 walk-ins
+    ALL 40 NIGHTS, EVERY INVARIANT HELD - no page errors
+
+
 ### 29 Aug — the app opens on a sign-in screen
 
 Jacob: *"i kind of like the idea of an login page and you just select your name
