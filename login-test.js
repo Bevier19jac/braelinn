@@ -25,7 +25,8 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
  ok('gate_is_up', await p.locator('#signIn').isVisible());
  ok('page_behind_is_locked', await p.evaluate(()=>document.body.classList.contains('gated')));
  const n = await p.locator('.si-row').count();
- ok('whole_roster_listed', n===34, n);
+ const roster = await p.evaluate(()=>LEAGUE.standings.length);
+ ok('whole_roster_listed', n===roster, {listed:n, roster:roster});
  ok('hosts_are_marked', await p.locator('.si-row .si-tag').count()===2);
  await p.fill('#siFilter','syd'); await p.waitForTimeout(200);
  ok('typing_narrows_it', await p.locator('.si-row').count()===1, await p.locator('.si-row').count());

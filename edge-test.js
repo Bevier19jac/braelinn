@@ -12,20 +12,30 @@ function load(now){
   return ctx;
 }
 
-console.log('\n== A FULL 34-PLAYER FIELD (sim never exceeds 18) ==');
+console.log('\n== A FULL-ROSTER FIELD (sim never exceeds 18) ==');
 {
   const {LEAGUE,BPL}=load();
+  /* Derived from the roster, never hard-coded -- a number typed in twice is
+     a number that drifts the day somebody joins the league. */
   const field=LEAGUE.standings.length;
-  chk(field===34,'roster is 34',field);
+  console.log('   roster size:',field);
+  chk(field>=8,'roster is big enough to be a league',field);
+  const names=LEAGUE.standings.map(p=>p.name);
+  chk(new Set(names).size===names.length,'every short name is unique',
+      names.filter((n,i)=>names.indexOf(n)!==i));
+  chk(names.every(n=>n && !/[.#$\[\]/]/.test(n)),
+      'no name contains a character Firebase forbids in a key',
+      names.filter(n=>!n||/[.#$\[\]/]/.test(n)));
   const pts=[]; for(let p=1;p<=field;p++) pts.push(BPL.pointsFor(p,field));
   chk(pts[0]===field*300,'winner of a full field',pts[0]);
   chk(pts[field-1]===300,'first out still gets 300',pts[field-1]);
   chk(new Set(pts).size===field,'every place scores differently');
   chk(pts.every((v,i)=>i===0||v<pts[i-1]),'points strictly decrease down the finish order');
   const splits=BPL.splitsFor(field);
-  const pay=BPL.payoutTable(34*30, field, splits);
-  chk(pay.reduce((a,b)=>a+b,0)===34*30,'payouts sum to the pot exactly at 34 players',
-      {pot:34*30,paid:pay.reduce((a,b)=>a+b,0),table:pay});
+  const pot=field*30;
+  const pay=BPL.payoutTable(pot, field, splits);
+  chk(pay.reduce((a,b)=>a+b,0)===pot,'payouts sum to the pot exactly at a full field',
+      {field:field,pot:pot,paid:pay.reduce((a,b)=>a+b,0),table:pay});
   chk(pay.every(a=>a>0),'nobody is paid $0 while being listed as paid');
 }
 

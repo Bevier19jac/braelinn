@@ -113,6 +113,25 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 30 Aug — Larry Stewart and Gregory James Lee joined the roster
+
+Roster is 36. Adding a player is purely additive: RSVPs, check-ins and results
+are all keyed by the SHORT name, so a new row cannot touch an existing answer.
+The two things that could go wrong are a duplicate short name (two people
+would share one RSVP) and a character Firebase forbids in a key. Both are now
+checked by `edge-test.js` on every run rather than by eye.
+
+- `Larry` / Larry Stewart, `Greg` / Gregory James Lee. Not marked `reg:true`,
+  so they sit behind "+ more on the invite list" until they're regulars.
+- `roster-add-test.js` proves it: both appear on the sign-in screen and are
+  findable by full name, every one of the other 34 RSVPs already on file reads
+  back byte-identical after the change, the new two start with no answer, and
+  both can sign in, RSVP, play a night, and land in the standings.
+- Two tests had "34" typed into them. Both now derive the number from the
+  roster -- the same lesson as the game date, the cache-buster and the rules
+  file: a number kept in two places drifts the day it matters.
+
+
 ### 30 Aug — breaking tables, the buy-in cutoff, and a full dress rehearsal
 
 Jacob: *"i would like there to be an easy way to redraw seats when converging
