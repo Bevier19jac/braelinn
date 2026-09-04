@@ -52,17 +52,29 @@ console.log('\n== BLIND STRUCTURE COVERS A LONG NIGHT ==');
 }
 
 console.log('\n== THE DATE ROLL ACROSS REAL CLOCK EDGES ==');
-// NOTE: the schedule holds ONE event. Until Season 7 dates are entered,
-// "after the game" can only mean "the season is over".
+/* Every case is derived from the calendar in data.js, so adding a game night
+   never breaks this test -- it just gets tested. */
 {
+  const {LEAGUE:L0}=load();
+  const cal = L0.schedule.map(e=>e.date).sort();
+  const first = cal[0], last = cal[cal.length-1];
+  const next  = cal.length > 1 ? cal[1] : null;
+  const at = (iso, h, mi, dayShift) => {
+    const [y,m,d]=iso.split('-').map(Number);
+    return new Date(y, m-1, d+(dayShift||0), h, mi).getTime();
+  };
+  console.log('   calendar:', cal.join(', '));
   const cases=[
-    ['day before, 11:59pm', new Date(2026,8,2,23,59).getTime(), '2026-09-03'],
-    ['game day, 00:01am',   new Date(2026,8,3,0,1).getTime(),   '2026-09-03'],
-    ['game day, 8:29pm',    new Date(2026,8,3,20,29).getTime(), '2026-09-03'],
-    ['game day, 11:59pm',   new Date(2026,8,3,23,59).getTime(), '2026-09-03'],
-    ['day after, 00:01am',  new Date(2026,8,4,0,1).getTime(),   null],
-    ['DST change day',      new Date(2026,10,1,1,30).getTime(), null]
+    ['day before the first, 11:59pm', at(first,23,59,-1), first],
+    ['first game day, 00:01am',       at(first,0,1),      first],
+    ['first game day, 8:29pm',        at(first,20,29),    first],
+    ['first game day, 11:59pm',       at(first,23,59),    first],
+    ['day after the last, 00:01am',   at(last,0,1,1),     null],
+    ['a year after the last',         at(last,12,0,365),  null]
   ];
+  /* The one that actually matters on a real season: the morning after a game
+     must roll to the NEXT one, not sit on the night that just happened. */
+  if (next) cases.splice(4, 0, ['morning after the first -> rolls on', at(first,9,0,1), next]);
   for (const [label, t, want] of cases) {
     const {BPL}=load(t);
     const g=BPL.currentGame();

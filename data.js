@@ -49,6 +49,7 @@ const LEAGUE = {
      ------------------------------------------------------------------------ */
   schedule: [
     { date: "2026-09-03", label: "Event 1", type: "regular", completed: false, note: "Season 7 Kickoff" }
+    , { date: "2026-09-15", label: "Event 2", type: "regular", completed: false, note: "" }
 
     /* ---- ADD THE REST HERE AS THE DATES COME IN -------------------------
        Copy a line, change the date and number. Keep them in date order.
@@ -139,15 +140,15 @@ const LEAGUE = {
   ],
 
   /* --------------------------------------------------------------------------
-     NEXT GAME — powers the hero, the RSVP date key, and the seat draw date key.
-     IMPORTANT: `date` decides which Firebase RSVP/seat node the app reads and
-     writes (rsvp_2026_09_03, seats_2026_09_03, ...). Roll it forward after
-     every game night.
-     TODO: confirm buy-in / rebuy / stacks with Nate.
+     NEXT GAME — the money and the chip counts. NOT the date.
+
+     `date` and `label` below are only a seed: BPL.currentGame() overwrites
+     both from the schedule above every time the app loads. Add the night to
+     `schedule` and the whole app follows. Editing the date here does nothing.
      ------------------------------------------------------------------------ */
   nextGame: {
-    date: "2026-09-03",   // Thursday, Sept 3 — Season 7 kickoff
-    label: "Event 1 — Season 7 Kickoff",
+    date: "2026-09-03",   // seed only — the schedule decides
+    label: "Event 1 — Season 7 Kickoff",   // seed only
     time: "8:30 PM",      // CONFIRMED — games always start 8:30
     buyin: 30,          // CONFIRMED
     rebuy: 30,          // CONFIRMED — same price for a rebuy or the 6,000-chip add-on
@@ -469,9 +470,22 @@ const BPL = {
     );
   },
 
-  /** Next incomplete event on the schedule (falls back to nextGame). */
+  /**
+   * Events still to come: not marked complete AND not already in the past.
+   *
+   * The date check matters more than the flag. Nobody remembers to tick
+   * "completed" the morning after a game, and a past date sitting in the
+   * "What's Coming" list is exactly the stale-site problem in miniature --
+   * people plan around a night that already happened.
+   */
   upcoming() {
-    return LEAGUE.schedule.filter(e => !e.completed);
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return LEAGUE.schedule.filter(e => {
+      if (!e || !e.date || e.completed) return false;
+      const [y, m, d] = e.date.split("-").map(Number);
+      return new Date(y, m - 1, d) >= todayStart;
+    });
   },
 
   activeAnnouncement() {

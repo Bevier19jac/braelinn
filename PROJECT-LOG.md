@@ -113,6 +113,29 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 4 Sep — Event 2 on the calendar, and the calendar stopped being two places
+
+Next game is **Tuesday 15 September, 8:30**. Braelinn runs every other week,
+Tuesday or Thursday, and the dates land as they land -- so the app has to cope
+with a short calendar rather than nag about it.
+
+- `schedule` gains Event 2. That is the ONLY place a date is now entered:
+  `BPL.currentGame()` already overwrites `nextGame.date`/`label` on every load,
+  so the comment telling people to "roll it forward after every game night"
+  was inviting exactly the drift it warned about. Rewritten to say the field
+  is a seed and editing it does nothing.
+- `BPL.upcoming()` filtered on `completed` alone, so a night nobody remembered
+  to tick stayed in "What's Coming" forever. It now drops past dates too.
+- Three tests had the calendar typed into them, which meant every new game
+  night broke a test and taught nobody anything. They now derive their cases
+  FROM `schedule`: first date, last date, and -- the one that matters on a
+  real season -- **the morning after a game must roll to the next one**, which
+  could not even be expressed while the calendar held a single event.
+
+Verified at a simulated 4 Sep: hero reads "Tuesday, September 15 - cards roll
+at 8:30 PM - Event 2", countdown 11 days, Sep 3 gone from What's Coming.
+
+
 ### 30 Aug — Larry Stewart and Gregory James Lee joined the roster
 
 Roster is 36. Adding a player is purely additive: RSVPs, check-ins and results
