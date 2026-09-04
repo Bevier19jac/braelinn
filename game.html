@@ -282,6 +282,16 @@
         <div class="stat"><span class="n" id="poRebuys">0</span><span class="l">Rebuys</span></div>
       </div>
       <p class="tiny muted" id="potNote"></p>
+
+      <!-- Where the money actually goes, line by line. The kitty and the
+           bounty both come off the top, so the pot people are playing for
+           is smaller than what was collected -- say so rather than let
+           someone add it up in their head at 1am. -->
+      <div class="moneyflow" id="moneyFlow"></div>
+
+      <!-- $20 on the last winner's head. Asked once, at the moment it
+           happens; reconstructing it afterwards is guesswork. -->
+      <div class="card bountycard mt" id="bountyCard" hidden></div>
     </section>
 
     <section>
@@ -691,6 +701,19 @@
       });
     }
 
+    /* The one fact the app cannot work out for itself, asked at the moment
+       it is knowable rather than at 1am when nobody remembers. */
+    const bt = Game.bountyTarget();
+    if (bt && bt.amount && Game.entrants().indexOf(bt.name) !== -1
+        && Game.active().indexOf(bt.name) === -1 && !Game.bountyClaimed()) {
+      items.push({
+        kind: "warn",
+        title: bt.name + " is out — who takes the " + BPL.money(bt.amount) + "?",
+        sub: "The bounty comes off tonight's pot. It can't be finalized until it's credited.",
+        actions: '<button class="btn btn-sm btn-primary" data-act="bounty">Credit it</button>'
+      });
+    }
+
     if (Game.readyToFinalize()) {
       items.push({
         kind: "good",
@@ -727,6 +750,7 @@
       document.getElementById("checkinList").scrollIntoView({ behavior: "smooth", block: "center" });
     }
     if (a === "consolidate") doConsolidate(Number(b.dataset.tc) || Game.idealTables());
+    if (a === "bounty") askBounty();
     if (a === "finalize") doFinalize();
   });
 
@@ -941,6 +965,7 @@
             (Photos.has(name) ? "Change photo" : "Add a photo") + '</button>' +
         '</div>' +
         (mine ? '<div class="ss-money" id="ssMoney"></div>' : '') +
+        (mine ? '<div class="ss-bust" id="ssBust"></div>' : '') +
         '<label class="tiny muted" for="ssChips">Chip count</label>' +
         '<input class="inp" id="ssChips" type="number" inputmode="numeric" min="0" step="25" ' +
           'value="' + (p.stack || "") + '" placeholder="e.g. 14200">' +
@@ -984,6 +1009,37 @@
             if (!yes) return;
             Game.claimRebuy(name).then(
               () => { UI.toast("Top-up added — settle up with the host", "ok"); close(); render(); },
+              err => UI.toast(err.message, "bad"));
+          });
+      };
+    }
+
+    /* Busting out, from your own seat. It sends a report -- the host confirms
+       it -- so a mis-tap at the table costs nobody a finishing place. This
+       used to live in a panel that no longer exists on this page, which meant
+       a player had no way to say they were out at all. */
+    const bust = wrap.querySelector("#ssBust");
+    if (bust) {
+      const pending = Game.pendingReports().find(r => r.name === name && r.type === "out");
+      if (p.status === "out") {
+        const pl = Game.placeOf(name);
+        bust.innerHTML = '<div class="ss-done">You finished ' +
+          (pl ? Game.ordinal(pl) : "—") + '.</div>';
+      } else if (pending) {
+        bust.innerHTML = '<div class="ss-pending">⏳ You reported out — waiting on the host.</div>';
+      } else {
+        bust.innerHTML = '<button class="btn btn-danger btn-block" data-imout type="button">' +
+          "I'm out</button>" +
+          '<p class="tiny muted" style="margin:6px 0 0">Tells the host. Your place isn\'t ' +
+          'recorded until they confirm it, so a mis-tap costs nothing.</p>';
+      }
+      const ob = bust.querySelector("[data-imout]");
+      if (ob) ob.onclick = () => {
+        UI.confirm("Bust out?", "Sends a report to the host. Nothing is recorded until they confirm.", "I'm out")
+          .then(yes => {
+            if (!yes) return;
+            Game.report(name, "out").then(
+              () => { UI.toast("Reported — the host will confirm it", "ok"); close(); render(); },
               err => UI.toast(err.message, "bad"));
           });
       };
@@ -1051,6 +1107,73 @@
   }
 
   /* =============================================================== MONEY */
+  /* ------------------------------------------------------------- BOUNTY
+
+     $20 rides on the last winner's head, stacking $20 a win while they keep
+     winning. The one thing the app cannot derive is WHO knocked them out --
+     so it asks, once, at the moment it happens.
+     ------------------------------------------------------------------- */
+  function renderBounty() {
+    const card = document.getElementById("bountyCard");
+    if (!card) return;
+    const t = Game.bountyTarget();
+    const S = Game.state();
+
+    if (!t || !t.amount) { card.hidden = true; return; }
+    card.hidden = false;
+
+    const claimed = S.bounty && S.bounty.wonBy;
+    const alive = Game.active().indexOf(t.name) !== -1;
+    const inTonight = Game.entrants().indexOf(t.name) !== -1;
+
+    let body =
+      '<div class="bt-head">' + UI.avatar(t.name, "sm") +
+        '<span class="bt-t"><b>' + BPL.money(t.amount) + ' on ' + UI.esc(t.name) + '</b>' +
+        '<small>' + (t.streak > 1
+          ? t.streak + " wins in a row — " + BPL.money(LEAGUE.bounty.amount) + " a win"
+          : "won the last game") + '</small></span></div>';
+
+    if (claimed) {
+      body += '<div class="bt-won">🎯 <b>' + UI.esc(S.bounty.wonBy) + '</b> took it — ' +
+              BPL.money(S.bounty.amount) + ' on top of their finish' +
+              '<button class="btn btn-sm" id="btnBountyUndo" type="button">Undo</button></div>';
+    } else if (!inTonight) {
+      body += '<p class="tiny muted" style="margin:10px 0 0">' + UI.esc(t.name) +
+              " isn't checked in. The bounty stays on their head — it comes off the pot " +
+              "only when they're playing.</p>";
+    } else if (alive) {
+      body += '<p class="tiny muted" style="margin:10px 0 0">Still in. ' +
+              "Whoever knocks them out takes the " + BPL.money(t.amount) + ".</p>";
+    } else {
+      body += '<button class="btn btn-primary btn-block mt" id="btnBountyClaim" type="button">' +
+              'Who knocked out ' + UI.esc(t.name) + '?</button>';
+    }
+    card.innerHTML = body;
+  }
+
+  function askBounty() {
+    const t = Game.bountyTarget();
+    if (!t) return;
+    /* Anyone who was in tonight could have been the one -- including players
+       who have since busted themselves. */
+    const items = Game.entrants().filter(n => n !== t.name).sort()
+      .map(n => ({ value: n, label: n,
+                   sub: Game.active().indexOf(n) !== -1 ? "still in" : "busted" }));
+    if (!items.length) { UI.toast("Nobody else is in tonight", "bad"); return; }
+    UI.pick("Who knocked out " + t.name + "?", items).then(who => {
+      if (!who) return;
+      Game.claimBounty(who).then(
+        () => { UI.toast(who + " takes the " + BPL.money(t.amount) + " bounty", "ok"); render(); },
+        err => UI.toast(err.message, "bad"));
+    });
+  }
+
+  UI.on("bountyCard", "click", e => {
+    if (!Admin.require()) return;
+    if (e.target.id === "btnBountyClaim") askBounty();
+    if (e.target.id === "btnBountyUndo") Game.clearBounty().then(render);
+  });
+
   function renderMoney() {
     const S = Game.state();
     const m = Game.pot();
@@ -1061,21 +1184,33 @@
 
     document.getElementById("potNote").textContent =
       m.entries + " × " + BPL.money(NG.buyin) + " buy-in" +
-      (m.rebuys ? " + " + m.rebuys + " × " + BPL.money(NG.rebuy || NG.buyin) + " rebuy" : "") +
-      (m.kitty ? " · " + BPL.money(m.kitty) + " to the season kitty" : "") +
-      " · " + BPL.money(m.net) + " playing for.";
+      (m.rebuys ? " + " + m.rebuys + " × " + BPL.money(NG.rebuy || NG.buyin) + " rebuy" : "") + ".";
+
+    const flow = [["Collected", m.gross, ""]];
+    if (m.kitty)  flow.push(["Season kitty", -m.kitty, Game.kittyPct() + "% of the take"]);
+    if (m.bounty) flow.push(["Bounty on " + m.bountyOn, -m.bounty,
+                             m.bountyStreak > 1 ? m.bountyStreak + " wins in a row" : "last winner"]);
+    flow.push(["Playing for", m.net, "paid out tonight"]);
+    document.getElementById("moneyFlow").innerHTML = flow.map((r, i) =>
+      '<div class="mf-row' + (i === flow.length - 1 ? " total" : "") + '">' +
+        '<span class="mf-l">' + UI.esc(r[0]) + (r[2] ? '<small>' + UI.esc(r[2]) + '</small>' : '') + '</span>' +
+        '<span class="mf-a">' + (r[1] < 0 ? "−" + BPL.money(-r[1]) : BPL.money(r[1])) + '</span>' +
+      '</div>').join("");
+
+    renderBounty();
 
     const amounts = BPL.payoutTable(m.net, m.entries || 1, Game.splits(m.entries || 1));
     const splits = Game.splits(m.entries || 1);
     document.getElementById("payHint").textContent = splits.length + " paid";
     document.getElementById("payoutList").innerHTML = amounts.map((a, i) =>
       '<div class="payout-row"><span class="pl">' + Game.ordinal(i + 1) + '</span>' +
-      '<span class="pc">' + splits[i] + '% · ' + BPL.chips(BPL.pointsFor(i + 1, m.entries || 1)) + ' pts</span>' +
+      '<span class="pc">' + splits[i] + '% · ' + BPL.chips(BPL.pointsFor(i + 1, m.entries || 1, a > 0)) + ' pts</span>' +
       '<span class="amt">' + BPL.money(a) + '</span></div>').join("");
 
     document.getElementById("payoutNote").textContent =
-      "Recalculates as people buy in and rebuy. Rounded to the nearest $5, remainder to 1st — " +
-      "the payouts always add up to the pot exactly.";
+      "Recalculates as people buy in and rebuy. Every payout lands on a $10 note, " +
+      "remainder to 1st — they always add up to the pot exactly. Cashing is worth an " +
+      "extra " + LEAGUE.points.itmBonus + " points on top of the finish.";
 
     /* Rebuy controls */
     const sec = document.getElementById("rebuySec");

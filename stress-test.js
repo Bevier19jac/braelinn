@@ -243,10 +243,13 @@ async function playGame(gameNo) {
   check(new Set(names).size === names.length, 'duplicate player in finish', { game: gameNo });
 
   const paid = rec.finish.reduce((s, f) => s + (f.winnings || 0), 0);
-  check(paid === rec.pot, 'payouts do not sum to pot', { game: gameNo, paid, pot: rec.pot });
+  check(paid === rec.pot + (rec.bounty || 0), 'payouts do not sum to pot',
+    { game: gameNo, paid, pot: rec.pot, bounty: rec.bounty || 0 });
 
   rec.finish.forEach(f => {
-    const expect = (field - f.place + 1) * 300;
+    /* Base points plus 100 for cashing. Written out rather than calling
+       pointsFor, so this stays an independent check of the formula. */
+    const expect = (field - f.place + 1) * 300 + (f.itm ? LEAGUE.points.itmBonus : 0);
     check(f.points === expect, 'points formula wrong',
       { game: gameNo, name: f.name, place: f.place, got: f.points, expect });
   });
@@ -257,15 +260,17 @@ async function playGame(gameNo) {
   const expectGross = field * LEAGUE.nextGame.buyin + rec.rebuys * LEAGUE.nextGame.rebuy;
   check(rec.gross === expectGross, 'gross money wrong',
     { game: gameNo, got: rec.gross, expect: expectGross });
-  check(rec.pot === rec.gross - rec.kitty, 'pot != gross - kitty', { game: gameNo });
+  check(rec.pot === rec.gross - rec.kitty - (rec.bounty || 0),
+    'pot != gross - kitty - bounty', { game: gameNo });
+  check(rec.kitty % 10 === 0, 'kitty is not a multiple of $10', { game: gameNo, kitty: rec.kitty });
   check(rec.finish.every(f => f.winnings >= 0), 'negative payout', { game: gameNo });
 
   /* standings aggregation must agree with the record */
   const agg = BPL.aggregate({ [rec.gameId]: rec });
   const winnerRow = agg.players.find(p => p.name === rec.winner);
   check(winnerRow && winnerRow.wins === 1, 'aggregate lost the win', { game: gameNo });
-  check(winnerRow && winnerRow.points === (field * 300), 'aggregate points wrong',
-    { game: gameNo, got: winnerRow && winnerRow.points, expect: field * 300 });
+  check(winnerRow && winnerRow.points === BPL.pointsFor(1, field, true), 'aggregate points wrong',
+    { game: gameNo, got: winnerRow && winnerRow.points, expect: BPL.pointsFor(1, field, true) });
 
   const totalPts = agg.players.reduce((s, p) => s + p.points, 0);
   const recPts = rec.finish.reduce((s, f) => s + f.points, 0);
@@ -306,10 +311,22 @@ async function scenarios() {
     const places = rec.finish.map(f => f.place).sort((a, b) => a - b);
     chk(rec.field === size, `field ${size}: wrong field size`, { got: rec.field });
     chk(places.every((p, i) => p === i + 1), `field ${size}: places not 1..N`, { places });
-    chk(rec.finish[0].points === size * 300, `field ${size}: winner points wrong`,
-        { got: rec.finish[0].points, expect: size * 300 });
+    /* Derived from the formula, not typed in -- the winner also cashes, so
+       the ITM bonus rides on top and a literal here would go stale the next
+       time a scoring rule lands. */
+    chk(rec.finish[0].points === BPL.pointsFor(1, size, true), `field ${size}: winner points wrong`,
+        { got: rec.finish[0].points, expect: BPL.pointsFor(1, size, true) });
+    const cashed = rec.finish.filter(f => f.itm);
+    chk(cashed.every(f => f.points === BPL.pointsFor(f.place, size, true)),
+        `field ${size}: in-the-money bonus missing`, cashed.map(f => f.name + ':' + f.points));
+    chk(rec.finish.filter(f => !f.itm).every(f => f.points === BPL.pointsFor(f.place, size, false)),
+        `field ${size}: a dry finish got the cash bonus`);
     const paid = rec.finish.reduce((s, f) => s + (f.winnings || 0), 0);
-    chk(paid === rec.pot, `field ${size}: payouts != pot`, { paid, pot: rec.pot });
+    chk(paid === rec.pot + (rec.bounty || 0), `field ${size}: payouts != pot`,
+        { paid, pot: rec.pot, bounty: rec.bounty || 0 });
+    chk(rec.finish.every(f => !f.winnings || f.winnings % 10 === 0 || f.bounty),
+        `field ${size}: a payout was not a multiple of $10`,
+        rec.finish.filter(f => f.winnings && f.winnings % 10).map(f => f.name + ':' + f.winnings));
     chk(rec.type === "regular", `field ${size}: event type not preserved`, { type: rec.type });
   }
 

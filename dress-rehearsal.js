@@ -38,7 +38,7 @@ const note = (night, what, detail) => {
  const B='http://localhost:8973/';
 
  console.log('Rehearsing ' + NIGHTS + ' complete game nights.\n');
- let consolidations = 0, rebuysTaken = 0, rebuysRefused = 0, walkIns = 0;
+ let consolidations = 0, rebuysTaken = 0, rebuysRefused = 0, walkIns = 0, bounties = 0;
 
  for (let night = 1; night <= NIGHTS; night++) {
    const field = 8 + Math.floor(Math.random()*20);          // 8..27 turn up
@@ -87,6 +87,29 @@ const note = (night, what, detail) => {
    if (!(await p.evaluate(()=>Admin.isUnlocked()))) note(night,'passcode did not unlock Master Control');
 
    await p.goto(B+'game.html',{waitUntil:'networkidle'}); await p.waitForTimeout(600);
+   /* Seed the history the bounty rides on. Every night the app writes to the
+      SAME game id, so without a dated predecessor there is never a defending
+      champion -- and the whole bounty path would go untested. Two nights in
+      three the champion is playing; the third he isn't, which must charge
+      nobody. */
+   const champ = night % 3 === 0
+     ? roster[roster.length - 1]                    // not invited tonight
+     : invited[1 + (night % 3)];
+   const streak = 1 + (night % 3);                  // sometimes stacked
+   await p.evaluate(async ([champ, streak]) => {
+     await DB.set('results', null);
+     for (let i = 0; i < streak; i++) {
+       const d = '2026-0' + (i + 1) + '-01';
+       await DB.set('results/' + d, {
+         gameId:d, date:d, season:7, label:'Prior', type:'regular', field:10,
+         buyinAmount:30, rebuyAmount:30, rebuys:0, gross:300, kittyPct:0, kitty:0,
+         pot:300, bounty:0, bountyOn:null, bountyStreak:0, bountyWonBy:null,
+         winner:champ, finalizedAt:Date.now(),
+         finish:[{place:1,name:champ,points:3000,rebuys:0,late:false,winnings:300,bounty:0,itm:true}]
+       });
+     }
+   }, [champ, streak]);
+   await p.waitForTimeout(500);
    await p.evaluate(async()=>{ await Game.resetNight(); await Game.start(); });
    await p.waitForTimeout(400);
    if (!(await p.locator('#btnMaster').isVisible())) note(night,'Master Control button missing for the host');
@@ -176,6 +199,31 @@ const note = (night, what, detail) => {
      await p.waitForTimeout(90);
    }
 
+   /* ------------------------------------ 6b. the bounty, if one is riding */
+   var bt = await p.evaluate(()=>{const t=Game.bountyTarget();return t?{name:t.name,amount:t.amount,streak:t.streak}:null;});
+   if (bt && bt.amount) {
+     const playing = await p.evaluate(n=>Game.entrants().indexOf(n)!==-1, bt.name);
+     const potNow = await p.evaluate(()=>Game.pot());
+     if (playing) {
+       if (potNow.bounty !== bt.amount) note(night,'bounty did not come off the pot',[potNow.bounty,bt.amount]);
+       if (potNow.net !== potNow.gross - potNow.kitty - potNow.bounty) note(night,'pot arithmetic is wrong',potNow);
+       /* If the champion is the one still standing, they kept their own
+          bounty -- nobody to credit, and finalize is right to allow it. Only
+          probe the guard when somebody else won, because a probe that
+          succeeds would write the record out from under step 7. */
+       const survivor = await p.evaluate(()=>Game.active()[0]);
+       if (survivor !== bt.name) {
+         const blocked = await p.evaluate(()=>Game.finalize().then(()=>'allowed').catch(e=>e.message));
+         if (blocked === 'allowed') note(night,'finalized with an uncredited bounty');
+         const killer = await p.evaluate(n=>Game.entrants().filter(x=>x!==n)[0], bt.name);
+         await p.evaluate(k=>Game.claimBounty(k), killer); bounties++;
+         await p.waitForTimeout(250);
+       }
+     } else if (potNow.bounty !== 0) {
+       note(night,'bounty charged for a champion who did not play',potNow.bounty);
+     }
+   }
+
    /* ------------------------------------------------------ 7. finalize */
    /* Standings come from the results in the database, so read those and
       aggregate exactly the way the standings page does. */
@@ -207,11 +255,32 @@ const note = (night, what, detail) => {
    const winner = rows.find(r=>r.place===1);
    if (!winner || winner.name !== game.winner) note(night,'winner does not match place 1');
 
+   /* Money: every payout on a $10 note, the whole pot handed out, the kitty
+      and the bounty accounted for, and cashing worth its bonus. */
+   const stray = rows.filter(r => r.winnings && !r.bounty && r.winnings % 10);
+   if (stray.length) note(night,'a payout was not a multiple of $10', stray.map(r=>r.name+':'+r.winnings));
+   if (game.kitty % 10) note(night,'kitty is not a multiple of $10', game.kitty);
+   const handed = rows.reduce((a,r)=>a+(r.winnings||0),0);
+   if (handed !== game.pot + (game.bounty||0)) note(night,'money does not balance',{handed, pot:game.pot, bounty:game.bounty});
+   if (game.pot !== game.gross - game.kitty - (game.bounty||0)) note(night,'pot != gross - kitty - bounty',
+     {gross:game.gross, kitty:game.kitty, bounty:game.bounty, pot:game.pot});
+   if (game.bounty && !game.bountyWonBy) note(night,'a bounty was charged but never credited');
+   const itmBonus = await p.evaluate(()=>LEAGUE.points.itmBonus);
+   const wrongPts = rows.filter(r =>
+     r.points !== (game.field - r.place + 1) * 300 + (r.itm ? itmBonus : 0));
+   if (wrongPts.length) note(night,'points wrong', wrongPts.slice(0,3).map(r=>r.name+':'+r.points));
+   if (!rows.some(r=>r.itm)) note(night,'nobody finished in the money');
+
    const after = await snapshot();
    for (const r of rows) {
      const gained = (after[r.name]||0) - (before[r.name]||0);
      if (r.name.indexOf('Walk-In') === 0) continue;
      if (gained !== r.points) note(night,'standings moved by the wrong amount for '+r.name,[gained,r.points]);
+   }
+   if (bt && bt.amount && game.bounty) {
+     if (game.bountyStreak !== streak) note(night,'streak wrong on the record',[game.bountyStreak,streak]);
+     if (game.bountyOn !== champ) note(night,'bounty was on the wrong player',[game.bountyOn,champ]);
+     if (game.bounty !== streak * 20) note(night,'bounty amount wrong',[game.bounty, streak*20]);
    }
 
    process.stdout.write('  night ' + String(night).padStart(2) + '  ' +
@@ -223,6 +292,7 @@ const note = (night, what, detail) => {
  console.log('  top-ups taken            : ' + rebuysTaken);
  console.log('  post-break top-ups blocked: ' + rebuysRefused);
  console.log('  walk-ins added           : ' + walkIns);
+ console.log('  bounties collected       : ' + bounties);
  console.log('  page errors              : ' + (errs.length ? JSON.stringify(errs.slice(0,3)) : 'none'));
  if (errs.length) problems.push('page errors: '+errs[0]);
 

@@ -96,6 +96,8 @@
     reports: {},
     seats: null,
     money: null,          // admin overrides for kitty % and payout splits
+    bounty: null,         // who took out the defending champion, once it happens
+    results: {},          // finalized games, for the bounty and the streak
     timer: null,
     rsvp: {},
     _subs: []
@@ -130,6 +132,10 @@
       DB.on(BASE + "/timer",   v => { S.timer   = v || null;      emit(); });
       DB.on("rsvp/" + GAME_ID, v => { S.rsvp    = v || {};        emit(); });
       DB.on("config/money",    v => { S.money   = v || null;      emit(); });
+      DB.on(BASE + "/bounty",  v => { S.bounty  = v || null;      emit(); });
+      /* Finalized history — the bounty rides on the last game's winner, and
+         who that is is a fact about games already played. */
+      DB.on("results",         v => { S.results = v || {};        emit(); });
     },
 
     state() { return S; },
@@ -193,15 +199,68 @@
       return DB.save("payout splits", () => DB.set("config/money/splits", a));
     },
 
-    /** Money on the table right now, straight from live state. */
+    /* ------------------------------------------------------------ BOUNTY */
+
+    /**
+     * Who is carrying the bounty tonight, and for how much. Derived from the
+     * finalized results, so it is right without anyone entering it.
+     */
+    bountyTarget() {
+      return BPL.bountyOn(S.results, GAME_ID);
+    },
+
+    /** True once the bounty player has been knocked out and credited. */
+    bountyClaimed() { return !!(S.bounty && S.bounty.wonBy); },
+
+    /**
+     * Record who knocked the defending champion out. Asked once, on the night,
+     * at the moment it happens -- reconstructing it afterwards is guesswork.
+     */
+    claimBounty(killer) {
+      const t = Game.bountyTarget();
+      if (!t) return Promise.reject(new Error("Nobody is carrying a bounty tonight"));
+      if (!killer) return Promise.reject(new Error("Say who knocked them out"));
+      return DB.save("bounty to " + killer, () => DB.set(BASE + "/bounty", {
+        target: t.name, amount: t.amount, wonBy: killer, at: DB.now()
+      }));
+    },
+
+    /** Undo a mis-tap. */
+    clearBounty() {
+      return DB.save("clear bounty", () => DB.set(BASE + "/bounty", null));
+    },
+
+    /** Money on the table right now, straight from live state.
+     *
+     *  gross -> kitty (nearest $10) -> bounty (off the top) -> tonight's pot.
+     */
     pot() {
       const buyin = LEAGUE.nextGame.buyin;
       const rebuy = LEAGUE.nextGame.rebuy || buyin;
       const entries = Game.fieldSize();
       const rebuys  = Game.totalRebuys();
       const gross   = entries * buyin + rebuys * rebuy;
-      const kitty   = Math.round(gross * Game.kittyPct() / 100);
-      return { entries: entries, rebuys: rebuys, gross: gross, kitty: kitty, net: gross - kitty };
+      const kitty   = BPL.round10(gross * Game.kittyPct() / 100);
+      const t       = Game.bountyTarget();
+      /* The bounty only comes off the pot when the champion is actually at
+         the table. If they don't turn up there is nobody to knock out, so
+         charging the room for it would take $20 off everyone's payout and
+         hand it to no one -- and finalizing would then be blocked forever.
+         Their head keeps the price; it just isn't collected tonight.
+
+         Capped at what is on the table, too: a long streak against a tiny
+         field must not pay a bounty out of thin air. */
+      const playing = !!(t && S.players[t.name]);
+      const bounty  = playing ? Math.max(0, Math.min(t.amount, gross - kitty)) : 0;
+      return {
+        entries: entries, rebuys: rebuys, gross: gross,
+        kitty: kitty,
+        bounty: bounty,
+        bountyOn: bounty ? t.name : null,
+        bountyStreak: bounty ? t.streak : 0,
+        bountyPlaying: playing,
+        net: gross - kitty - bounty
+      };
     },
 
     /**
@@ -693,17 +752,30 @@
           seen[0] + "–" + seen[seen.length - 1] + "). Check the player list before finalizing."));
       }
 
+      /* The bounty. If nobody knocked the champion out, they survived to win
+         their own bounty -- there is nobody else it could go to. */
+      const bt = Game.bountyTarget();
+      const bountyWinner = money.bounty > 0
+        ? ((S.bounty && S.bounty.wonBy) || (bt && bt.name === winner ? winner : null))
+        : null;
+
       const rows = finish.map(f => {
         const p = S.players[f.name] || {};
         const win = payTable[f.place - 1] || 0;
+        const itm = win > 0;
+        const bnty = (bountyWinner && f.name === bountyWinner) ? money.bounty : 0;
         return {
           place: f.place,
           name: f.name,
-          points: BPL.pointsFor(f.place, field),   // existing formula, unchanged
+          /* Base formula unchanged. The 100 for cashing rides on whether they
+             actually got paid, because how many places pay moves with the
+             field -- three some nights, six others. */
+          points: BPL.pointsFor(f.place, field, itm),
           rebuys: p.rebuys || 0,
           late: !!p.late,
-          winnings: win,
-          itm: win > 0
+          winnings: win + bnty,
+          bounty: bnty,
+          itm: itm
         };
       });
 
@@ -724,10 +796,25 @@
         kittyPct: Game.kittyPct(),
         kitty: money.kitty,
         pot: money.net,
+        /* What the bounty was, who was carrying it, and who took it. Kept on
+           the permanent record so a season's worth of bounties can be read
+           back without replaying the nights. */
+        bounty: money.bounty,
+        bountyOn: money.bountyOn || null,
+        bountyStreak: money.bountyStreak || 0,
+        bountyWonBy: bountyWinner || null,
         winner: winner,
         finish: rows,
         finalizedAt: DB.now()
       };
+
+      /* A bounty that was on the table and never accounted for would quietly
+         lose $20 of somebody's money. Refuse rather than swallow it. */
+      if (money.bounty > 0 && !bountyWinner) {
+        return Promise.reject(new Error(
+          "$" + money.bounty + " bounty on " + money.bountyOn +
+          " hasn't been credited. Say who knocked them out first."));
+      }
 
       const patch = {};
       patch["results/" + GAME_ID] = record;

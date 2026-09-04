@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "BRAELINN POKER LEAGUE — Firebase Realtime Database rules.",
+    "BRAELINN POKER LEAGUE \u2014 Firebase Realtime Database rules.",
     "DO NOT PASTE THIS FILE INTO FIREBASE. It has _comment keys, which",
     "Firebase rejects with: expected 'rules' property. Paste the generated",
     "file FIREBASE-RULES-PASTE-THIS.json instead. Edit THIS file, then run",
@@ -10,30 +10,33 @@
     "host from a player, because that requires server-side verification that a",
     "static site with no accounts cannot do."
   ],
-
   "rules": {
     ".read": false,
     ".write": false,
-
     "leagues": {
       "braelinn": {
-
         ".read": true,
-
         "config": {
           ".write": true,
           "money": {
-        "_comment": "Kitty % and payout splits, set by the host on game night.",
-        "kittyPct": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 50" },
-        "splits":   { ".validate": "newData.hasChildren()" },
-        "$other":   { ".validate": false }
-      },
-      "pin": {
+            "_comment": "Kitty % and payout splits, set by the host on game night.",
+            "kittyPct": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 50"
+            },
+            "splits": {
+              ".validate": "newData.hasChildren()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "pin": {
             ".validate": "newData.isString() && newData.val().length >= 4 && newData.val().length <= 12"
           },
-          "$other": { ".validate": false }
+          "$other": {
+            ".validate": false
+          }
         },
-
         "photos": {
           "_comment": [
             "Player-uploaded avatars, stored as small JPEG data URLs.",
@@ -45,7 +48,6 @@
             ".validate": "newData.isString() && newData.val().length <= 40000 && newData.val().beginsWith('data:image/')"
           }
         },
-
         "rsvp": {
           "$gameId": {
             ".write": true,
@@ -54,61 +56,124 @@
             }
           }
         },
-
         "live": {
           "$gameId": {
             ".write": true,
-
             "status": {
               ".validate": "newData.isString() && newData.val().matches(/^(checkin|running|final)$/)"
             },
-
             "players": {
               "$player": {
                 ".validate": "newData.hasChildren(['status'])",
-                "status":  { ".validate": "newData.val().matches(/^(active|out)$/)" },
-                "bustAt":  { ".validate": "newData.isNumber() || !newData.exists()" },
-                "stack":   { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000" },
-                "stackAt": { ".validate": "newData.isNumber()" },
-                "stackBy": { ".validate": "newData.isString() && newData.val().length <= 40" },
-                "rebuyBy": { ".validate": "newData.isString() && newData.val().length <= 40" },
-                "rebuyAt": { ".validate": "newData.isNumber()" },
-                "buyins":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10" },
-                "rebuys":  { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 20" },
-                "late":    { ".validate": "newData.isBoolean()" },
-                "bonus":   { ".validate": "newData.isBoolean()" },
-                "joinedAt":{ ".validate": "newData.isNumber()" },
-                "$other":  { ".validate": false }
+                "status": {
+                  ".validate": "newData.val().matches(/^(active|out)$/)"
+                },
+                "bustAt": {
+                  ".validate": "newData.isNumber() || !newData.exists()"
+                },
+                "stack": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000"
+                },
+                "stackAt": {
+                  ".validate": "newData.isNumber()"
+                },
+                "stackBy": {
+                  ".validate": "newData.isString() && newData.val().length <= 40"
+                },
+                "rebuyBy": {
+                  ".validate": "newData.isString() && newData.val().length <= 40"
+                },
+                "rebuyAt": {
+                  ".validate": "newData.isNumber()"
+                },
+                "buyins": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10"
+                },
+                "rebuys": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 20"
+                },
+                "late": {
+                  ".validate": "newData.isBoolean()"
+                },
+                "bonus": {
+                  ".validate": "newData.isBoolean()"
+                },
+                "joinedAt": {
+                  ".validate": "newData.isNumber()"
+                },
+                "$other": {
+                  ".validate": false
+                }
               }
             },
-
             "reports": {
               "$id": {
                 ".validate": "newData.hasChildren(['name','type','at'])",
-                "name": { ".validate": "newData.isString() && newData.val().length <= 40" },
-                "type": { ".validate": "newData.val().matches(/^(out|win)$/)" },
-                "at":   { ".validate": "newData.isNumber()" },
-                "$other": { ".validate": false }
+                "name": {
+                  ".validate": "newData.isString() && newData.val().length <= 40"
+                },
+                "type": {
+                  ".validate": "newData.val().matches(/^(out|win)$/)"
+                },
+                "at": {
+                  ".validate": "newData.isNumber()"
+                },
+                "$other": {
+                  ".validate": false
+                }
               }
             },
-
-            "seats": {
-              "tables": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 6" },
-              "order":  { ".validate": "newData.hasChildren()" },
-              "drawnAt":{ ".validate": "newData.isNumber()" },
-              "$other": { ".validate": false }
+            "_bounty": "$20 on the last winner's head, stacking per consecutive win. Only who took it is stored -- the amount and the target are derived from finalized results, so a bad write here can misdirect the money but never invent it.",
+            "bounty": {
+              "target": {
+                ".validate": "newData.isString() && newData.val().length <= 40"
+              },
+              "wonBy": {
+                ".validate": "newData.isString() && newData.val().length <= 40"
+              },
+              "amount": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "$other": {
+                ".validate": false
+              }
             },
-
+            "seats": {
+              "tables": {
+                ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 6"
+              },
+              "order": {
+                ".validate": "newData.hasChildren()"
+              },
+              "drawnAt": {
+                ".validate": "newData.isNumber()"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
             "timer": {
-              "running":       { ".validate": "newData.isBoolean()" },
-              "paused":        { ".validate": "newData.isBoolean()" },
-              "startedAt":     { ".validate": "newData.isNumber()" },
-              "elapsedBefore": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-              "$other":        { ".validate": false }
+              "running": {
+                ".validate": "newData.isBoolean()"
+              },
+              "paused": {
+                ".validate": "newData.isBoolean()"
+              },
+              "startedAt": {
+                ".validate": "newData.isNumber()"
+              },
+              "elapsedBefore": {
+                ".validate": "newData.isNumber() && newData.val() >= 0"
+              },
+              "$other": {
+                ".validate": false
+              }
             }
           }
         },
-
         "results": {
           "$gameId": {
             "_comment": [
@@ -121,31 +186,65 @@
             ],
             ".write": "!data.exists() && newData.exists()",
             ".validate": "newData.hasChildren(['gameId','date','field','finish','winner','finalizedAt'])",
-
-            "gameId":      { ".validate": "newData.isString()" },
-            "date":        { ".validate": "newData.isString()" },
-            "season":      { ".validate": "newData.isNumber()" },
-            "label":       { ".validate": "newData.isString()" },
-            "field":       { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 100" },
-            "winner":      { ".validate": "newData.isString()" },
-            "finalizedAt": { ".validate": "newData.isNumber()" },
-            "type":        { ".validate": "newData.isString()" },
-
+            "gameId": {
+              ".validate": "newData.isString()"
+            },
+            "date": {
+              ".validate": "newData.isString()"
+            },
+            "season": {
+              ".validate": "newData.isNumber()"
+            },
+            "label": {
+              ".validate": "newData.isString()"
+            },
+            "field": {
+              ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 100"
+            },
+            "winner": {
+              ".validate": "newData.isString()"
+            },
+            "finalizedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "type": {
+              ".validate": "newData.isString()"
+            },
             "finish": {
               "$row": {
                 ".validate": "newData.hasChildren(['place','name','points'])",
-                "place":    { ".validate": "newData.isNumber() && newData.val() >= 1" },
-                "name":     { ".validate": "newData.isString()" },
-                "points":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
-                "winnings": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-                "rebuys":   { ".validate": "newData.isNumber() && newData.val() >= 0" },
-                "itm":      { ".validate": "newData.isBoolean()" },
-                "late":     { ".validate": "newData.isBoolean()" },
-                "$other":   { ".validate": false }
+                "place": {
+                  ".validate": "newData.isNumber() && newData.val() >= 1"
+                },
+                "name": {
+                  ".validate": "newData.isString()"
+                },
+                "points": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0"
+                },
+                "winnings": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0"
+                },
+                "rebuys": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0"
+                },
+                "itm": {
+                  ".validate": "newData.isBoolean()"
+                },
+                "late": {
+                  ".validate": "newData.isBoolean()"
+                },
+                "$other": {
+                  ".validate": false
+                },
+                "bounty": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0"
+                }
               }
             },
-
-            "$other": { ".validate": true }
+            "$other": {
+              ".validate": true
+            }
           }
         }
       }

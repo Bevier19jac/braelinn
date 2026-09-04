@@ -242,7 +242,22 @@ const LEAGUE = {
        are never rewritten, so switching it on later costs nothing. */
     placeBonus: [],
 
-    describe: "Points = (players outlasted + 1) × 300. Win a 20-handed field, take 6,000."
+    /* CONFIRMED 4 Sep — everyone who finishes in the money gets a flat 100 on
+       top, however many places happen to pay that night (three some nights,
+       six others). Tied to cashing, not to a place number. */
+    itmBonus: 100,
+
+    describe: "Points = (players outlasted + 1) × 300, plus 100 for cashing. Win a 20-handed field, take 6,100."
+  },
+
+  /* --------------------------------------------------------------------------
+     BOUNTY — $20 off the top of the night's pot, on the last winner's head.
+     Whoever knocks them out takes it. Back-to-back wins stack it: two in a
+     row and they carry $40, three and it's $60.
+     ------------------------------------------------------------------------ */
+  bounty: {
+    amount: 20,
+    describe: "$20 on the last winner's head, stacking $20 per consecutive win."
   },
 
 
@@ -303,23 +318,86 @@ const BPL = {
     return (tier ? tier.splits : LEAGUE.payouts.tiers[LEAGUE.payouts.tiers.length - 1].splits).slice();
   },
 
-  /** Points a player earns for finishing `place` out of `field`.
-      LEAGUE RULE — do not change without Nate. */
-  pointsFor(place, field) {
+  /**
+   * Points a player earns for finishing `place` out of `field`.
+   * LEAGUE RULE — do not change without Nate.
+   *
+   * `itm` is whether they finished in the money. How many places pay changes
+   * with the field — three some nights, six others — so the bonus is tied to
+   * cashing, not to a place number. Pass it and the ITM bonus is included.
+   */
+  pointsFor(place, field, itm) {
     const base  = (field - place + 1) * LEAGUE.points.perPlaceMultiplier;
     const bonus = (LEAGUE.points.placeBonus || [])[place - 1] || 0;
-    return base + bonus;
+    const cash  = itm ? (LEAGUE.points.itmBonus || 0) : 0;
+    return base + bonus + cash;
+  },
+
+  /* ------------------------------------------------------------- BOUNTY ---
+
+     $20 comes off the top of the night's pot and rides on the last game's
+     winner. Knock them out, take the $20. Win two in a row and they carry
+     $40 the next night, three in a row $60.
+
+     Derived from the finalized results, never entered by hand — who the
+     champion is and how long the streak runs are facts about games already
+     played, and a fact kept in two places drifts.
+     --------------------------------------------------------------------- */
+
+  /** Finalized games, oldest first. */
+  gamesByDate(results) {
+    return Object.keys(results || {})
+      .map(k => results[k])
+      .filter(g => g && g.date && g.winner && g.finish)
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   },
 
   /**
-   * Prize money by place for a given net pool. Rounded to the nearest $5 with
-   * the remainder pushed into 1st, so the payouts always sum to the pot exactly.
-   * Returns an array indexed by (place - 1).
+   * Who carries the bounty into the next game, and for how much.
+   * null before the first game of the league — nothing to defend yet.
+   */
+  bountyOn(results, beforeDate) {
+    const games = BPL.gamesByDate(results)
+      .filter(g => !beforeDate || String(g.date) < String(beforeDate));
+    if (!games.length) return null;
+
+    const champ = games[games.length - 1].winner;
+
+    /* Consecutive wins counting back from the most recent game. Somebody else
+       winning resets it, whether or not the champion played that night. */
+    let streak = 0;
+    for (let i = games.length - 1; i >= 0; i--) {
+      if (games[i].winner !== champ) break;
+      streak++;
+    }
+
+    const per = (LEAGUE.bounty && LEAGUE.bounty.amount) || 0;
+    return {
+      name: champ,
+      streak: streak,
+      amount: per * streak,
+      since: games[games.length - streak].date
+    };
+  },
+
+  /** Nearest $10. Nobody at this table wants to count out singles. */
+  round10(n) { return Math.round(Number(n || 0) / 10) * 10; },
+
+  /**
+   * Prize money by place for a given net pool. Every payout lands on a $10
+   * note, with the remainder pushed into 1st so the table still sums to the
+   * pot exactly. Returns an array indexed by (place - 1).
+   *
+   * Rounding to tens can push a small last paid place to $0, which would list
+   * somebody as "in the money" for nothing — and now that cashing is worth
+   * 100 points, a $0 cash would be worth points too. Those places are dropped
+   * and their share rolls up, so every paid place is genuinely paid.
    */
   payoutTable(net, field, splitsOverride) {
     const splits = (Array.isArray(splitsOverride) && splitsOverride.length)
       ? splitsOverride : BPL.splitsFor(field || 1);
-    const amounts = splits.map(p => Math.round(net * p / 100 / 5) * 5);
+    const amounts = splits.map(p => BPL.round10(net * p / 100));
+    while (amounts.length > 1 && amounts[amounts.length - 1] <= 0) amounts.pop();
     const drift = net - amounts.reduce((a, b) => a + b, 0);
     if (amounts.length) amounts[0] += drift;
     return amounts;

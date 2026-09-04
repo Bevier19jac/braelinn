@@ -121,14 +121,32 @@
           (g.rebuys ? ' · ' + g.rebuys + ' rebuys' : '') +
           (g.pot ? ' · ' + BPL.money(g.pot) + ' pot' : '') + '</small></span>' +
           '<span class="tag done">' + UI.esc(g.label || "Game") + '</span></summary>' +
+        /* Where the money went. The kitty and the bounty come off the top,
+           so "collected" and "played for" are different numbers -- printing
+           only one of them is how a night ends in an argument. */
+        '<div class="moneyflow inresult">' +
+          [["Collected", g.gross, ""],
+           g.kitty  ? ["Season kitty", -g.kitty, (g.kittyPct || 0) + "% of the take"] : null,
+           g.bounty ? ["Bounty on " + (g.bountyOn || "the last winner"), -g.bounty,
+                       g.bountyWonBy ? g.bountyWonBy + " took it" : ""] : null,
+           ["Paid out", g.pot, rows.filter(r => r.itm || r.winnings).length + " in the money"]
+          ].filter(Boolean).map((r, j, all) =>
+            '<div class="mf-row' + (j === all.length - 1 ? " total" : "") + '">' +
+              '<span class="mf-l">' + UI.esc(r[0]) +
+                (r[2] ? '<small>' + UI.esc(r[2]) + '</small>' : '') + '</span>' +
+              '<span class="mf-a">' + (r[1] < 0 ? "−" + BPL.money(-r[1]) : BPL.money(r[1])) + '</span>' +
+            '</div>').join("") +
+        '</div>' +
         '<div class="tbl-scroll"><table class="tbl">' +
         '<thead><tr><th>#</th><th>Player</th><th>Pts</th><th>$</th></tr></thead><tbody>' +
         rows.map(r =>
           '<tr' + (r.place === 1 ? ' class="win"' : '') + '>' +
           '<td class="num">' + r.place + '</td>' +
           '<td>' + UI.esc(r.name) +
-            (r.rebuys ? ' <span class="tiny muted">+' + r.rebuys + 'r</span>' : '') + '</td>' +
-          '<td class="num">' + BPL.chips(r.points) + '</td>' +
+            (r.rebuys ? ' <span class="tiny muted">+' + r.rebuys + 'r</span>' : '') +
+            (r.bounty ? ' <span class="bt-tag">🎯 ' + BPL.money(r.bounty) + '</span>' : '') + '</td>' +
+          '<td class="num">' + BPL.chips(r.points) +
+            (r.itm ? '<small class="itm">+' + (LEAGUE.points.itmBonus || 0) + '</small>' : '') + '</td>' +
           '<td class="num">' + (r.winnings ? BPL.money(r.winnings) : "—") + '</td></tr>').join("") +
         '</tbody></table></div></details>';
     }).join("");

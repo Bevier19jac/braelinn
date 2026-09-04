@@ -113,6 +113,69 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 4 Sep — money rules: $10 rounding, the kitty line, the bounty, ITM points
+
+Six rules from Jacob, all confirmed league policy.
+
+**Rounding.** Payouts and the kitty both land on a $10 note (`BPL.round10`).
+Rounding to tens can push a small last paid place to $0 — which would list
+somebody as in the money for nothing, and now that cashing is worth points, a
+$0 cash would be worth points too. Those places are dropped and their share
+rolls up, so every paid place is genuinely paid. The remainder still goes to
+1st, so the table sums to the pot exactly.
+
+**In the money = +100 points.** Tied to CASHING, not to a place number — three
+places pay some nights, six others, so a place-indexed bonus would be wrong
+half the time. `BPL.pointsFor(place, field, itm)`. Checked across every field
+from 2 to 40 that the bonus can never let a worse finish outscore a better one
+(it can't: places are 300 apart).
+
+**The bounty.** $20 off the top of the night's pot, riding on the last game's
+winner. Whoever knocks them out takes it. Consecutive wins stack it — $40
+back-to-back, $60 for three. Entirely DERIVED from the finalized results
+(`BPL.bountyOn`): who the champion is and how long the streak runs are facts
+about games already played, and a fact kept in two places drifts.
+
+Three decisions worth writing down:
+
+- **The one thing the app cannot derive is who knocked them out**, so it asks
+  — once, at the moment it happens, with a picker of everyone who played. The
+  action queue chases it, and `finalize()` REFUSES while a charged bounty is
+  uncredited. Quietly writing the record would lose $20 of somebody's money.
+- **If the champion doesn't turn up, nothing comes off the pot.** Caught by
+  the rehearsal, not by reading: charging the room for a bounty nobody can
+  win takes $20 off everyone's payout, hands it to no one, and then blocks
+  finalizing forever because the target can never bust.
+- **If the champion wins outright, they keep their own bounty.** Nobody
+  knocked them out; there is nowhere else for it to go. Flagged to Jacob.
+
+**Players can mark themselves out.** The top-up was already self-serve. "I'm
+out" was NOT — it lived in `renderMe()`, which returns immediately because the
+panel it draws into no longer exists on that page. A player had no way to
+report busting at all. Now it is on their own seat sheet, below the chip count
+and the top-up, and it still sends a REPORT the host confirms, so a mis-tap at
+the table costs nobody a finishing place.
+
+**The money is shown line by line** — Collected → season kitty → bounty →
+playing for — in Master Control live and on each result. Printing only the
+total is how a night ends in an argument.
+
+Firebase rules: new `live/<id>/bounty` node and `bounty` on a finish row.
+Needs republishing.
+
+Tests: `money-test.js` (rounding across every field 2–40 × 4 rebuy counts × 5
+kitty percentages, the ITM bonus, the streak), `bounty-test.js` (the whole arc
+through the real page, including the champion winning outright and the
+champion not turning up), `selfserve-test.js` (a player's own top-up and
+bust). `stress-test.js` and `dress-rehearsal.js` gained money-balance checks
+and had three hard-coded point formulas replaced.
+
+Verified: 30 complete nights through the real UI — 39 consolidations, 90
+top-ups, 30 post-break attempts blocked, 10 walk-ins, 18 bounties collected —
+every invariant held, no page errors. Plus 400 simulated tournaments and 12
+chaos nights.
+
+
 ### 4 Sep — Event 2 on the calendar, and the calendar stopped being two places
 
 Next game is **Tuesday 15 September, 8:30**. Braelinn runs every other week,

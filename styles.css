@@ -1636,3 +1636,50 @@ body.gated { overflow: hidden; }
 .consol-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .consol-btns .btn { flex: 1 1 auto; min-width: 116px; }
 .consol-btns .btn[disabled] { opacity: .45; cursor: default; }
+
+/* --------------------------------------------------------- MONEY FLOW ----
+   Collected -> kitty -> bounty -> what's actually played for. Printing only
+   the total is how a night ends in an argument. */
+.moneyflow { margin-top: 12px; display: flex; flex-direction: column; gap: 1px; }
+.moneyflow.inresult { margin: 0 0 12px; }
+.mf-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; background: #0b1e1580;
+  border: 1px solid var(--line-soft); border-radius: var(--radius-s);
+  font-size: 13.5px;
+}
+.mf-l { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.mf-l small { font-size: 11px; color: var(--ink-dim); }
+.mf-a { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 700; color: var(--ink-mute); }
+.mf-row.total { border-color: var(--brass-dim); background: #14342380; }
+.mf-row.total .mf-l { font-weight: 700; }
+.mf-row.total .mf-a { color: var(--brass-hi); font-size: 15px; }
+
+/* ------------------------------------------------------------ BOUNTY ----- */
+.bountycard { border-color: var(--brass-dim); }
+.bt-head { display: flex; align-items: center; gap: 10px; }
+.bt-t { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.bt-t b { font-size: 15px; color: var(--brass-hi); }
+.bt-t small { font-size: 11.5px; color: var(--ink-mute); }
+.bt-won {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px; padding: 9px 11px; font-size: 13px;
+  background: #14342380; border: 1px solid var(--line); border-radius: var(--radius-s);
+}
+.bt-won .btn { margin-left: auto; }
+.bt-tag {
+  font-size: 10.5px; font-weight: 700; color: var(--brass-hi);
+  border: 1px solid var(--brass-dim); border-radius: 999px; padding: 1px 6px;
+  white-space: nowrap;
+}
+small.itm { display: block; font-size: 10px; color: var(--ok); font-weight: 600; }
+
+/* Busting out from your own seat. Deliberately below the chip count and the
+   top-up: it is the last thing you do, not the first thing you see. */
+.ss-bust { margin: 14px 0 4px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.ss-done, .ss-pending {
+  padding: 9px 11px; border-radius: var(--radius-s); font-size: 13px;
+  border: 1px solid var(--line-soft); background: #0e241980;
+}
+.ss-pending { color: var(--maybe); border-color: var(--brass-dim); }
+.ss-done { color: var(--ink-mute); }
