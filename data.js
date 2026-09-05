@@ -239,7 +239,9 @@ const LEAGUE = {
        To turn it on, list the bonus for 1st, 2nd, 3rd... e.g.
            placeBonus: [1500, 1000, 750, 500, 250]
        Standings recompute from history the moment it changes -- raw results
-       are never rewritten, so switching it on later costs nothing. */
+       are never rewritten, so switching it on later costs nothing. This is
+       true because BPL.scoreOf recomputes every row from place/field/itm;
+       it was NOT true until 5 Sep, when the stored number was trusted. */
     placeBonus: [],
 
     /* CONFIRMED 4 Sep — everyone who finishes in the money gets a flat 100 on
@@ -441,6 +443,33 @@ const BPL = {
    * only READS it, so changing the season policy later recomputes the whole
    * table from history without touching a single stored result.
    */
+  /**
+   * What a finished row is worth, TODAY.
+   *
+   * Points are recomputed from the facts the record stores — the place, the
+   * size of the field, and whether they got paid — rather than read back out
+   * of the record. A game is a permanent record of what HAPPENED; what that
+   * is worth is a league rule, and league rules change.
+   *
+   * Found on 5 Sep: the in-the-money bonus went live after a game was already
+   * in the books, so the standings kept scoring that night under the old
+   * formula. The comment in `points` above had claimed for weeks that
+   * standings "recompute from history the moment it changes". They didn't.
+   * Now they do, and switching a scoring rule on genuinely costs nothing.
+   *
+   * Falls back to the stored number only if the record is too old or too odd
+   * to recompute from — better a stale point total than a zero.
+   */
+  scoreOf(game, row) {
+    const field = Number(game && game.field);
+    const place = Number(row && row.place);
+    if (!isFinite(field) || !isFinite(place) || field < 1 || place < 1) {
+      return Number(row && row.points) || 0;
+    }
+    const itm = row.itm !== undefined ? !!row.itm : (Number(row.winnings) || 0) > 0;
+    return BPL.pointsFor(place, field, itm);
+  },
+
   aggregate(results) {
     const byName = {};
     LEAGUE.standings.forEach(p => {
@@ -487,8 +516,9 @@ const BPL = {
         }
         const p = byName[r.name];
         p.events += 1;
-        p._rawPoints += r.points || 0;
-        p._eventPoints.push(r.points || 0);
+        const pts = BPL.scoreOf(g, r);
+        p._rawPoints += pts;
+        p._eventPoints.push(pts);
         p.winnings += r.winnings || 0;
         p.rebuys += r.rebuys || 0;
         if (r.place === 1) p.wins += 1;

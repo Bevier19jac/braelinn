@@ -64,6 +64,40 @@ console.log('\n== IN THE MONEY IS WORTH ' + LEAGUE.points.itmBonus + ' POINTS ==
   ok('a worse finish never outscores a better one', inverted.length===0, inverted.slice(0,3));
 }
 
+console.log('\n== A GAME ALREADY IN THE BOOKS RESCORES UNDER TODAY\'S RULES ==');
+{
+  /* A record written BEFORE the in-the-money bonus existed: old point totals
+     baked in, no bounty field. The standings must not keep scoring that night
+     under the retired formula. */
+  const old = {gameId:'2026-09-03',date:'2026-09-03',season:7,label:'Event 1',type:'regular',
+    field:10,winner:'Nate',finalizedAt:1,pot:300,gross:300,kitty:0,
+    finish:[{place:1,name:'Nate',points:3000,winnings:150,rebuys:0,itm:true},
+            {place:2,name:'Syd',points:2700,winnings:90,rebuys:0,itm:true},
+            {place:3,name:'Tod',points:2400,winnings:60,rebuys:0,itm:true},
+            {place:4,name:'Guy',points:2100,winnings:0,rebuys:0,itm:false},
+            {place:10,name:'Jacob',points:300,winnings:0,rebuys:0,itm:false}]};
+  const a = BPL.aggregate({'2026-09-03': old});
+  const pts = n => (a.players.find(p=>p.name===n)||{}).points;
+  ok('the winner picks up the bonus', pts('Nate')===3100, pts('Nate'));
+  ok('so does everyone else who cashed', pts('Syd')===2800 && pts('Tod')===2500, [pts('Syd'),pts('Tod')]);
+  ok('nobody who missed it gains anything', pts('Guy')===2100 && pts('Jacob')===300, [pts('Guy'),pts('Jacob')]);
+  ok('the record itself is untouched', old.finish[0].points===3000, old.finish[0].points);
+
+  /* And where itm was never written, fall back to whether they got paid. */
+  const noItm = JSON.parse(JSON.stringify(old));
+  noItm.finish.forEach(r => delete r.itm);
+  const b = BPL.aggregate({'2026-09-03': noItm});
+  const bp = n => (b.players.find(p=>p.name===n)||{}).points;
+  ok('winnings stand in for a missing itm flag', bp('Nate')===3100 && bp('Guy')===2100, [bp('Nate'),bp('Guy')]);
+
+  /* A record too odd to recompute keeps whatever it stored, rather than 0. */
+  const odd = {gameId:'x',date:'2026-01-01',season:7,label:'x',type:'regular',
+    winner:'Nate',finalizedAt:1,
+    finish:[{place:1,name:'Nate',points:999},{place:2,name:'Syd',points:111}]};
+  const cp = BPL.aggregate({x: odd}).players.find(p=>p.name==='Nate');
+  ok('a record with no field size keeps its stored points', cp.points===999, cp.points);
+}
+
 console.log('\n== THE BOUNTY STACKS WITH CONSECUTIVE WINS ==');
 {
   const g = (date,winner)=>({date,winner,field:10,finish:[{place:1,name:winner,points:3000}]});

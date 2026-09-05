@@ -438,16 +438,22 @@ async function scenarios() {
     const agg = BPL.aggregate(results);
     const nate  = agg.players.find(p => p.name === "Nate");
     const jacob = agg.players.find(p => p.name === "Jacob");
-    chk(nate.points === 3300, "policy: cumulative total wrong for Nate", { got: nate.points });
-    chk(jacob.points === 5700, "policy: cumulative total wrong for Jacob", { got: jacob.points });
-    chk(nate.rawPoints === 3300, "policy: rawPoints must always be the full total", { got: nate.rawPoints });
+    /* Derived, not typed in: standings rescore every row from place/field/itm
+       under TODAY's rules, so a literal here would go stale the next time a
+       scoring rule lands -- which is exactly what happened on 5 Sep. */
+    const P = (place, itm) => BPL.pointsFor(place, 10, itm);
+    const nateTotal  = P(1, true) + P(10, false);
+    const jacobTotal = P(2, true) + P(1, true);
+    chk(nate.points === nateTotal, "policy: cumulative total wrong for Nate", { got: nate.points, expect: nateTotal });
+    chk(jacob.points === jacobTotal, "policy: cumulative total wrong for Jacob", { got: jacob.points, expect: jacobTotal });
+    chk(nate.rawPoints === nateTotal, "policy: rawPoints must always be the full total", { got: nate.rawPoints });
 
     // switching the policy must recompute from the same untouched history
     LEAGUE.seasonScoring = { mode: "bestN", n: 1 };
     const agg2 = BPL.aggregate(results);
     const nate2 = agg2.players.find(p => p.name === "Nate");
-    chk(nate2.points === 3000, "policy: bestN did not apply", { got: nate2.points });
-    chk(nate2.rawPoints === 3300, "policy: raw history was altered by policy change",
+    chk(nate2.points === P(1, true), "policy: bestN did not apply", { got: nate2.points, expect: P(1, true) });
+    chk(nate2.rawPoints === nateTotal, "policy: raw history was altered by policy change",
         { got: nate2.rawPoints });
     chk(results["2026-09-03"].finish[0].points === 3000,
         "policy: stored event result was mutated", {});

@@ -113,6 +113,40 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 5 Sep — standings were still scoring an old game under the retired formula
+
+Jacob, after the first real game night: *"at least the standings are wrong
+cause those ITM should have an extra 100 points."* He was right, and it was my
+mistake.
+
+`finalize()` computes each row's points and writes the NUMBER into the
+permanent record. `aggregate()` then summed those stored numbers. So the
+in-the-money bonus, which went live after 3 Sep was already in the books,
+could never reach that night — the standings kept scoring it under the formula
+that existed when it was finalized.
+
+Worse, the comment in `points` had been claiming for weeks that "standings
+recompute from history the moment it changes -- raw results are never
+rewritten, so switching it on later costs nothing." That was aspirational. It
+described the design, not the code.
+
+**Fix: `BPL.scoreOf(game, row)`.** Standings now recompute every row from the
+facts the record stores — place, field size, and whether they cashed — under
+TODAY's rules. A game record is a permanent statement of what HAPPENED; what
+that is worth is a league rule, and league rules change. The record is never
+rewritten; only the arithmetic over it moves. Falls back to the stored number
+when a record is too old or odd to recompute from (no field size), because a
+stale total beats a zero.
+
+This makes the placeBonus switch, and any future scoring change, genuinely
+retroactive and genuinely free — which is what the file had been promising.
+
+Also fixed: four hard-coded point totals in `stress-test.js` that only passed
+because the formula hadn't changed since they were typed. Same lesson as the
+game date, the cache-buster, the rules file and the roster count — a number
+kept in two places drifts the day it matters.
+
+
 ### 4 Sep — money rules: $10 rounding, the kitty line, the bounty, ITM points
 
 Six rules from Jacob, all confirmed league policy.
