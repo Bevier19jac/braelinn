@@ -38,7 +38,7 @@ const note = (night, what, detail) => {
  const B='http://localhost:8973/';
 
  console.log('Rehearsing ' + NIGHTS + ' complete game nights.\n');
- let consolidations = 0, rebuysTaken = 0, rebuysRefused = 0, walkIns = 0, bounties = 0;
+ let consolidations = 0, rebuysTaken = 0, rebuysRefused = 0, walkIns = 0, bounties = 0, selfCheckIns = 0;
 
  for (let night = 1; night <= NIGHTS; night++) {
    const field = 8 + Math.floor(Math.random()*20);          // 8..27 turn up
@@ -119,6 +119,27 @@ const note = (night, what, detail) => {
    await p.click('#btnCheckInAll'); await p.waitForTimeout(700);
    let checked = await p.evaluate(()=>Game.entrants().length);
    if (checked !== invited.length) note(night,'check-in-everyone missed people',[checked,invited.length]);
+
+   /* Some nights a few people let themselves in at the door instead of
+      being checked in, and mark their own money. */
+   if (night % 2 === 0) {
+     const walkUps = invited.slice(0, 3);
+     await p.evaluate(async(list)=>{
+       for (const n of list) { await Game.undoCheckIn(n); }
+       for (const n of list) {
+         localStorage.setItem('bpl_me', n);
+         await Game.selfCheckIn(n);
+         await Game.settle(n, n);
+       }
+       localStorage.setItem('bpl_me', 'Nate');
+     }, walkUps);
+     await p.waitForTimeout(300);
+     const selfIn = await p.evaluate(l=>l.every(n=>Game.selfEntered(n)), walkUps);
+     if (!selfIn) note(night,'a self check-in was not recorded as one');
+     const settled = await p.evaluate(l=>l.every(n=>Game.owes(n)===0), walkUps);
+     if (!settled) note(night,'a player who paid still shows as owing');
+     selfCheckIns += walkUps.length;
+   }
 
    /* the no-shows get removed again */
    const noShow = invited.slice(field);
@@ -252,6 +273,12 @@ const note = (night, what, detail) => {
    if (rows.length !== entrants) note(night,'the result lost players',[rows.length,entrants]);
    if (new Set(rows.map(r=>r.name)).size !== rows.length) note(night,'a player appears twice in the result');
    if (game.field !== entrants) note(night,'field size wrong in the record',[game.field,entrants]);
+   /* Money in the room must reconcile: what was charged is what was owed. */
+   const money = await p.evaluate(()=>({c:Game.collected(), u:Game.unpaid()}));
+   if (money.c.charged !== game.gross) note(night,'charged does not match the gross',[money.c.charged, game.gross]);
+   if (money.c.paid + money.u.total !== money.c.charged)
+     note(night,'paid + outstanding does not equal charged', money);
+
    const winner = rows.find(r=>r.place===1);
    if (!winner || winner.name !== game.winner) note(night,'winner does not match place 1');
 
@@ -293,6 +320,7 @@ const note = (night, what, detail) => {
  console.log('  post-break top-ups blocked: ' + rebuysRefused);
  console.log('  walk-ins added           : ' + walkIns);
  console.log('  bounties collected       : ' + bounties);
+ console.log('  self check-ins           : ' + selfCheckIns);
  console.log('  page errors              : ' + (errs.length ? JSON.stringify(errs.slice(0,3)) : 'none'));
  if (errs.length) problems.push('page errors: '+errs[0]);
 

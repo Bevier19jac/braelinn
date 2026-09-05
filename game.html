@@ -83,6 +83,12 @@
       </div>
       <h3 id="waitTitle">Seats haven't been drawn yet</h3>
       <p id="waitBody"></p>
+
+      <!-- The door. You arrive at Nate's, you tap this, you're in the field.
+           No queue, no host tap -- the whole point is that it works while
+           he's counting chips. -->
+      <div id="doorBox"></div>
+
       <div class="ps-meta" id="waitMeta"></div>
     </div>
   </section>
@@ -283,6 +289,10 @@
       </div>
       <p class="tiny muted" id="potNote"></p>
 
+      <!-- Who has actually handed over cash. Players mark themselves paid;
+           this is the board that says who hasn't. -->
+      <div class="card owed mt" id="owedCard"></div>
+
       <!-- Where the money actually goes, line by line. The kitty and the
            bounty both come off the top, so the pot people are playing for
            is smaller than what was collected -- say so rather than let
@@ -300,7 +310,27 @@
       <p class="tiny muted mt" id="payoutNote"></p>
 
       <div class="card mt moneycfg">
-        <label class="tiny muted" for="cfgKitty">Season kitty</label>
+        <!-- Say it the way you'd say it out loud: "kitty's a hundred and
+             twenty, first gets two hundred, pay four." Everything below 1st
+             is worked out from there. -->
+        <label class="tiny muted">Tonight, in dollars</label>
+        <div class="plan3">
+          <label class="pl3"><span>Kitty $</span>
+            <input class="inp" id="cfgKittyAmt" type="number" inputmode="numeric" min="0" step="10" placeholder="0"></label>
+          <label class="pl3"><span>1st gets $</span>
+            <input class="inp" id="cfgFirst" type="number" inputmode="numeric" min="0" step="10" placeholder="200"></label>
+          <label class="pl3"><span>Places paid</span>
+            <input class="inp" id="cfgPlaces" type="number" inputmode="numeric" min="1" max="12" step="1" placeholder="4"></label>
+        </div>
+        <button class="btn btn-primary btn-block mt" id="btnPlan" type="button">Set the money</button>
+        <p class="tiny muted" id="planNote" style="margin:8px 0 0"></p>
+        <button class="btn btn-sm btn-block mt" id="btnPlanReset" type="button" hidden>
+          Back to percentages
+        </button>
+
+        <hr class="cfg-hr">
+
+        <label class="tiny muted" for="cfgKitty">Or a kitty percentage</label>
         <div class="row2">
           <input class="inp" id="cfgKitty" type="number" inputmode="decimal"
                  min="0" max="50" step="0.5" placeholder="0">
@@ -475,7 +505,73 @@
     if (who) document.getElementById("whoSelect").value = who;
   }
 
+  /* ------------------------------------------------------------- THE DOOR
+
+     Check yourself in when you get there, and say when you've handed Nate
+     the money. Both are things you know and he has to chase -- so they are
+     yours, and he gets a board showing who still owes.
+     ------------------------------------------------------------------- */
+  function renderDoor() {
+    const box = document.getElementById("doorBox");
+    if (!box) return;
+    const who = me();
+    const S = Game.state();
+    const p = S.players[who];
+
+    if (!who) { box.innerHTML = ""; return; }
+
+    if (!p) {
+      box.innerHTML =
+        '<button class="btn btn-primary btn-block door-in" id="btnImHere" type="button">' +
+          "I'm here — check me in</button>" +
+        '<p class="tiny muted" style="margin:8px 0 0">Counts straight away. ' +
+          'Tell Nate you\'ve paid on the next screen.</p>';
+      return;
+    }
+
+    const owes = Game.owes(who);
+    const charged = Game.charged(who);
+    box.innerHTML =
+      '<div class="door-in-ok">✓ You\'re checked in' +
+        (Game.selfEntered(who) ? "" : " by the host") + '</div>' +
+      '<div class="door-money">' +
+        '<span class="dm-l">In for <b>' + BPL.money(charged) + '</b>' +
+          (p.rebuys ? '<small>buy-in + top-up</small>' : '') + '</span>' +
+        (owes
+          ? '<button class="btn btn-sm btn-primary" id="btnIPaid" type="button">' +
+            'I paid ' + BPL.money(owes) + '</button>'
+          : '<span class="dm-paid">Paid ✓</span>') +
+      '</div>';
+  }
+
+  UI.on("doorBox", "click", e => {
+    const who = me();
+    if (!who) return;
+    if (e.target.id === "btnImHere") {
+      UI.confirm("Check yourself in?", "You'll be in tonight's field straight away.", "I'm here")
+        .then(yes => {
+          if (!yes) return;
+          Game.selfCheckIn(who).then(
+            () => { UI.toast("You're in — see Nate for chips", "ok"); render(); },
+            err => UI.toast(err.message, "bad"));
+        });
+    }
+    if (e.target.id === "btnIPaid") {
+      const owes = Game.owes(who);
+      UI.confirm("Paid " + BPL.money(owes) + "?",
+                 "This tells Nate you've settled up. He can correct it if it's wrong.",
+                 "Yes, I paid")
+        .then(yes => {
+          if (!yes) return;
+          Game.settle(who, who).then(
+            () => { UI.toast("Marked paid", "ok"); render(); },
+            err => UI.toast(err.message, "bad"));
+        });
+    }
+  });
+
   function renderWaiting() {
+    renderDoor();
     const who = me();
     const S = Game.state();
     const inField = !!S.players[who];
@@ -486,10 +582,8 @@
       n ? "Waiting on the seat draw" : "Nothing started yet tonight";
 
     document.getElementById("waitBody").textContent = inField
-      ? "You're checked in. The table appears here the moment the seats are drawn, and you'll be able to update your chip count from it."
-      : n
-        ? "Check in with the host when you arrive. Once everyone's in, the seats get drawn and the table appears here."
-        : "The host checks players in at the door, then draws the seats. This page turns into the table when that happens.";
+      ? "The table appears here the moment the seats are drawn, and you'll be able to update your chip count from it."
+      : "Tap below when you get to Nate's. Once everyone's in, the seats get drawn and this page turns into the table.";
 
     const bits = [];
     bits.push(inField ? "You're <b>checked in</b>"
@@ -1174,6 +1268,52 @@
     if (e.target.id === "btnBountyUndo") Game.clearBounty().then(render);
   });
 
+  /* ------------------------------------------------------------- OWED
+
+     Players say when they've paid. This is the other half: the short list
+     of who hasn't, with one tap to settle anyone at the table -- because
+     somebody always hands over a twenty without touching their phone.
+     ------------------------------------------------------------------- */
+  function renderOwed() {
+    const card = document.getElementById("owedCard");
+    if (!card) return;
+    const ent = Game.entrants();
+    if (!ent.length) { card.hidden = true; return; }
+    card.hidden = false;
+
+    const { rows, total } = Game.unpaid();
+    const c = Game.collected();
+
+    let body =
+      '<div class="owed-head"><b>' + BPL.money(c.paid) + ' collected</b>' +
+        '<small>of ' + BPL.money(c.charged) + ' owed tonight</small></div>';
+
+    if (!rows.length) {
+      body += '<p class="tiny muted" style="margin:10px 0 0">Everyone has settled up.</p>';
+    } else {
+      body += '<div class="owed-list">' + rows.map(r =>
+        '<div class="owed-row">' + UI.avatar(r.name, "sm") +
+          '<span class="nm">' + UI.esc(r.name) +
+            (r.paid ? '<small>paid ' + BPL.money(r.paid) + ' of ' + BPL.money(r.charged) + '</small>' : '') +
+          '</span>' +
+          '<button class="btn btn-sm btn-primary" data-settle="' + UI.esc(r.name) + '">' +
+            BPL.money(r.owes) + '</button>' +
+        '</div>').join("") + '</div>' +
+        '<p class="tiny muted" style="margin:10px 0 0">' + BPL.money(total) +
+        ' outstanding. Tap an amount to mark it paid.</p>';
+    }
+    card.innerHTML = body;
+  }
+
+  UI.on("owedCard", "click", e => {
+    const b = e.target.closest("button[data-settle]");
+    if (!b || !Admin.require()) return;
+    const n = b.dataset.settle;
+    Game.settle(n, me() || "host").then(
+      () => { UI.toast(n + " marked paid", "ok"); render(); },
+      err => UI.toast(err.message, "bad"));
+  });
+
   function renderMoney() {
     const S = Game.state();
     const m = Game.pot();
@@ -1198,14 +1338,20 @@
       '</div>').join("");
 
     renderBounty();
+    renderOwed();
 
-    const amounts = BPL.payoutTable(m.net, m.entries || 1, Game.splits(m.entries || 1));
+    const plan = Game.payouts(m.net, m.entries || 1);
+    const amounts = plan.table || [];
     const splits = Game.splits(m.entries || 1);
-    document.getElementById("payHint").textContent = splits.length + " paid";
-    document.getElementById("payoutList").innerHTML = amounts.map((a, i) =>
-      '<div class="payout-row"><span class="pl">' + Game.ordinal(i + 1) + '</span>' +
-      '<span class="pc">' + splits[i] + '% · ' + BPL.chips(BPL.pointsFor(i + 1, m.entries || 1, a > 0)) + ' pts</span>' +
-      '<span class="amt">' + BPL.money(a) + '</span></div>').join("");
+    document.getElementById("payHint").textContent =
+      plan.error ? "check the numbers" : amounts.length + " paid";
+    document.getElementById("payoutList").innerHTML = plan.error
+      ? '<div class="card"><p class="empty tiny" style="padding:12px">⚠ ' + UI.esc(plan.error) + '</p></div>'
+      : amounts.map((a, i) =>
+          '<div class="payout-row"><span class="pl">' + Game.ordinal(i + 1) + '</span>' +
+          '<span class="pc">' + (m.net ? Math.round(a / m.net * 100) + '%' : '—') + ' · ' +
+            BPL.chips(BPL.pointsFor(i + 1, m.entries || 1, a > 0)) + ' pts</span>' +
+          '<span class="amt">' + BPL.money(a) + '</span></div>').join("");
 
     document.getElementById("payoutNote").textContent =
       "Recalculates as people buy in and rebuy. Every payout lands on a $10 note, " +
@@ -1238,13 +1384,42 @@
   function renderMoneyCfg() {
     const m = Game.pot();
     const custom = !!(Game.state().money && Game.state().money.splits);
+
+    /* The dollar plan. Don't fight the host's typing -- only refill a field
+       they aren't standing in. */
+    const set = (id, v) => {
+      const el = document.getElementById(id);
+      if (el && document.activeElement !== el) el.value = (v === null || v === undefined) ? "" : v;
+    };
+    set("cfgKittyAmt", Game.kittyAmount());
+    set("cfgFirst", Game.firstPrize());
+    set("cfgPlaces", Game.placesPaid());
+
+    const planned = Game.firstPrize() && Game.placesPaid();
+    const pn = document.getElementById("planNote");
+    if (pn) {
+      if (planned) {
+        const plan = Game.payouts(m.net, m.entries || 1);
+        pn.textContent = plan.error
+          ? "⚠ " + plan.error
+          : BPL.money(m.net) + " to play for → " +
+            plan.table.map(a => BPL.money(a)).join(" · ");
+      } else {
+        pn.textContent = "Leave these blank and payouts follow the percentage table below.";
+      }
+    }
+    const pr = document.getElementById("btnPlanReset");
+    if (pr) pr.hidden = !(planned || Game.kittyAmount() !== null);
+
     const k = document.getElementById("cfgKitty");
     if (k && document.activeElement !== k) k.value = Game.kittyPct();
 
     const kn = document.getElementById("kittyNote");
-    if (kn) kn.textContent = Game.kittyPct() > 0
-      ? BPL.money(m.kitty) + " of tonight's " + BPL.money(m.gross) + " is held back."
-      : "Nothing held back — the whole pot pays out tonight.";
+    if (kn) kn.textContent = Game.kittyAmount() !== null
+      ? "Overridden by the " + BPL.money(Game.kittyAmount()) + " above."
+      : Game.kittyPct() > 0
+        ? BPL.money(m.kitty) + " of tonight's " + BPL.money(m.gross) + " is held back."
+        : "Nothing held back — the whole pot pays out tonight.";
 
     const sp = document.getElementById("cfgSplits");
     if (sp && document.activeElement !== sp) sp.value = Game.splits(m.entries || 1).join(", ");
@@ -1256,6 +1431,33 @@
     const rb = document.getElementById("btnSplitsReset");
     if (rb) rb.hidden = !custom;
   }
+
+  UI.on("btnPlan", "click", () => {
+    const kitty  = document.getElementById("cfgKittyAmt").value;
+    const first  = document.getElementById("cfgFirst").value;
+    const places = document.getElementById("cfgPlaces").value;
+
+    /* Kitty first: the payout plan is checked against the pot AFTER the
+       kitty comes out, so setting them the other way round would reject a
+       perfectly good table. */
+    Game.setKittyAmount(kitty === "" ? null : kitty)
+      .then(() => Game.setPrizePlan(first === "" ? null : first, places === "" ? null : places))
+      .then(() => {
+        const m = Game.pot();
+        const plan = Game.payouts(m.net, m.entries || 1);
+        UI.toast(plan.error ? plan.error
+          : (first === "" ? "Kitty set" : BPL.money(Number(first)) + " to 1st, " + places + " paid"),
+          plan.error ? "bad" : "ok");
+        render();
+      }, e => UI.toast(e.message, "bad"));
+  });
+
+  UI.on("btnPlanReset", "click", () => {
+    Game.setKittyAmount(null)
+      .then(() => Game.setPrizePlan(null, null))
+      .then(() => { UI.toast("Back to percentages", "ok"); render(); },
+            e => UI.toast(e.message, "bad"));
+  });
 
   UI.on("btnKitty", "click", () => {
     Game.setKittyPct(document.getElementById("cfgKitty").value)

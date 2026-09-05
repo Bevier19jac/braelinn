@@ -386,6 +386,66 @@ const BPL = {
   round10(n) { return Math.round(Number(n || 0) / 10) * 10; },
 
   /**
+   * Payouts the way a host actually says them out loud:
+   *
+   *     "kitty's a hundred and twenty, first gets two hundred, pay four."
+   *
+   * Give it the money left after the kitty and the bounty, what 1st takes,
+   * and how many places pay. Everything below 1st is worked out from the
+   * league's own split curve for that many places, scaled to whatever is
+   * left, rounded to $10, with the drift pushed into 2nd so the table adds
+   * up to the pot exactly.
+   *
+   * Returns null when the numbers cannot make an honest table, and says why
+   * — a payout list that doesn't add up is worse than no payout list.
+   */
+  payoutPlan(net, first, places, splitsOverride) {
+    const pot = Math.max(0, Math.round(Number(net) || 0));
+    const n = Math.max(1, Math.round(Number(places) || 1));
+    const top = Math.round(Number(first) || 0);
+
+    if (top <= 0) return { error: "First place needs a dollar amount." };
+    if (top > pot) return { error: "First place is more than the " + BPL.money(pot) + " pot." };
+    if (n === 1) {
+      return top === pot
+        ? { table: [pot] }
+        : { error: "Paying one place means 1st takes the whole " + BPL.money(pot) + "." };
+    }
+
+    const rest = pot - top;
+    if (rest <= 0) return { error: "Nothing left for the other " + (n - 1) + " places." };
+
+    /* Shape the tail on the league's own curve for a field this deep, so
+       2nd through last still slope the way they always have. */
+    const curve = (Array.isArray(splitsOverride) && splitsOverride.length >= n)
+      ? splitsOverride.slice(0, n)
+      : BPL.splitsFor(n * 3);              // a tier deep enough to have n places
+    const tail = (curve.length >= n ? curve : BPL.splitsFor(999)).slice(1, n);
+    while (tail.length < n - 1) tail.push(tail[tail.length - 1] || 1);
+    const tailSum = tail.reduce((a, b) => a + b, 0) || 1;
+
+    const amounts = [top].concat(tail.map(w => BPL.round10(rest * w / tailSum)));
+    const drift = pot - amounts.reduce((a, b) => a + b, 0);
+    amounts[1] += drift;
+
+    if (amounts.some(a => a <= 0)) {
+      return { error: "That leaves a place on $0 — pay fewer places, or less to 1st." };
+    }
+    for (let i = 1; i < amounts.length; i++) {
+      if (amounts[i] >= amounts[i - 1]) {
+        return { error: BPL.ordinalOf(i + 1) + " would get as much as " + BPL.ordinalOf(i) +
+                        ". Give 1st more, or pay fewer places." };
+      }
+    }
+    return { table: amounts };
+  },
+
+  ordinalOf(n) {
+    const s = ["th", "st", "nd", "rd"], v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  },
+
+  /**
    * Prize money by place for a given net pool. Every payout lands on a $10
    * note, with the remainder pushed into 1st so the table still sums to the
    * pot exactly. Returns an array indexed by (place - 1).

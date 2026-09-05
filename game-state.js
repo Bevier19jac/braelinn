@@ -176,6 +176,68 @@
       return BPL.splitsFor(field || 1);
     },
 
+    /* The kitty as a DOLLAR amount, which is how Nate says it: "kitty's a
+       hundred and twenty." When one is set it wins over the percentage --
+       a fixed number is a decision, a percentage is a rule of thumb. */
+    kittyAmount() {
+      const m = S.money;
+      return (m && typeof m.kittyAmount === "number") ? m.kittyAmount : null;
+    },
+
+    /** What 1st takes tonight, if the host has named a number. */
+    firstPrize() {
+      const m = S.money;
+      return (m && typeof m.firstPrize === "number" && m.firstPrize > 0) ? m.firstPrize : null;
+    },
+
+    /** How many places pay, if the host has named a number. */
+    placesPaid() {
+      const m = S.money;
+      return (m && typeof m.places === "number" && m.places >= 1) ? m.places : null;
+    },
+
+    /**
+     * Tonight's payout table, however the host chose to say it.
+     *
+     * "First gets 200, pay four" wins when it is set. Otherwise the
+     * percentage splits, exactly as before. Returns { table } or { error }.
+     */
+    payouts(net, field) {
+      const f = Game.firstPrize();
+      const n = Game.placesPaid();
+      if (f && n) return BPL.payoutPlan(net, f, n, Game.splits(field || 1));
+      return { table: BPL.payoutTable(net, field || 1, Game.splits(field || 1)) };
+    },
+
+    setKittyAmount(dollars) {
+      if (dollars === null || dollars === "") {
+        return DB.save("kitty back to a percentage", () => DB.set("config/money/kittyAmount", null));
+      }
+      const n = Math.round(Number(dollars));
+      if (!isFinite(n) || n < 0 || n > 5000) {
+        return Promise.reject(new Error("Kitty must be a dollar amount up to $5,000"));
+      }
+      return DB.save("kitty " + BPL.money(n), () => DB.set("config/money/kittyAmount", n));
+    },
+
+    /** "First gets 200, pay four." Both together, or both cleared. */
+    setPrizePlan(first, places) {
+      if (first === null || first === "" || places === null || places === "") {
+        return DB.save("back to percentage payouts",
+          () => DB.multi({ "config/money/firstPrize": null, "config/money/places": null }));
+      }
+      const f = Math.round(Number(first));
+      const n = Math.round(Number(places));
+      if (!isFinite(f) || f <= 0) return Promise.reject(new Error("First place needs a dollar amount"));
+      if (f > 10000) return Promise.reject(new Error("That's more than any night's pot"));
+      if (!isFinite(n) || n < 1 || n > 12) return Promise.reject(new Error("Pay between 1 and 12 places"));
+      /* Refuse to store a plan that cannot make an honest table tonight. */
+      const test = BPL.payoutPlan(Game.pot().net, f, n, Game.splits(Game.fieldSize() || 1));
+      if (test.error) return Promise.reject(new Error(test.error));
+      return DB.save("payouts: " + BPL.money(f) + " to 1st, " + n + " paid",
+        () => DB.multi({ "config/money/firstPrize": f, "config/money/places": n }));
+    },
+
     setKittyPct(pct) {
       const n = Number(pct);
       if (!isFinite(n) || n < 0 || n > 50) {
@@ -240,7 +302,9 @@
       const entries = Game.fieldSize();
       const rebuys  = Game.totalRebuys();
       const gross   = entries * buyin + rebuys * rebuy;
-      const kitty   = BPL.round10(gross * Game.kittyPct() / 100);
+      const fixed   = Game.kittyAmount();
+      const kitty   = Math.min(gross, fixed === null ? BPL.round10(gross * Game.kittyPct() / 100)
+                                                     : BPL.round10(fixed));
       const t       = Game.bountyTarget();
       /* The bounty only comes off the pot when the champion is actually at
          the table. If they don't turn up there is nobody to knock out, so
@@ -255,6 +319,7 @@
       return {
         entries: entries, rebuys: rebuys, gross: gross,
         kitty: kitty,
+        kittyFixed: fixed !== null,
         bounty: bounty,
         bountyOn: bounty ? t.name : null,
         bountyStreak: bounty ? t.streak : 0,
@@ -536,16 +601,97 @@
       opts = opts || {};
       const existing = S.players[name];
       if (existing) return Promise.resolve();
-      return DB.save("check in " + name, () => DB.set(BASE + "/players/" + name, {
+      const row = {
         status: "active",
         place: null,
         buyins: 1,
         rebuys: 0,
         late: !!opts.late,
         bonus: opts.late ? false : true,   // on-time chips only if not late
-        joinedAt: DB.now()
-      }));
+        joinedAt: DB.now(),
+        paid: 0                            // dollars actually handed over
+      };
+      if (opts.by) row.inBy = opts.by;     // who checked them in
+      return DB.save("check in " + name, () => DB.set(BASE + "/players/" + name, row));
     },
+
+    /* --------------------------------------------------------- THE DOOR
+
+       A player checking themselves in at Nate's. It counts immediately --
+       waiting on a host tap at the door is the queue this replaces -- but it
+       records WHO did it, so Nate can see at a glance which entries he did
+       not make himself.
+       ------------------------------------------------------------------- */
+    selfCheckIn(name) {
+      if (!name) return Promise.reject(new Error("Say who you are first"));
+      if (S.players[name]) return Promise.resolve();
+      const late = Game.clock().started;
+      return Game.checkIn(name, { by: name, late: late });
+    },
+
+    /** True when this entry was the player's own tap, not the host's. */
+    selfEntered(name) {
+      const p = S.players[name];
+      return !!(p && p.inBy === name);
+    },
+
+    /* ------------------------------------------------------------ MONEY
+
+       What each player OWES tonight is derived from what they took: the
+       buy-in plus any top-up. What they have PAID is a number they -- or
+       the host -- set. Nobody reconstructs it afterwards from memory.
+       ------------------------------------------------------------------- */
+
+    charged(name) {
+      const p = S.players[name];
+      if (!p) return 0;
+      const buyin = LEAGUE.nextGame.buyin;
+      const rebuy = LEAGUE.nextGame.rebuy || buyin;
+      return (p.buyins || 1) * buyin + (p.rebuys || 0) * rebuy;
+    },
+
+    paid(name) {
+      const p = S.players[name];
+      return p ? (p.paid || 0) : 0;
+    },
+
+    owes(name) { return Math.max(0, Game.charged(name) - Game.paid(name)); },
+
+    /** Everyone who still owes something, and the total outstanding. */
+    unpaid() {
+      const rows = Game.entrants()
+        .map(n => ({ name: n, owes: Game.owes(n), charged: Game.charged(n), paid: Game.paid(n) }))
+        .filter(r => r.owes > 0)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return { rows: rows, total: rows.reduce((s, r) => s + r.owes, 0) };
+    },
+
+    /** Money collected so far, against what the night has charged. */
+    collected() {
+      const ent = Game.entrants();
+      return {
+        paid: ent.reduce((s, n) => s + Game.paid(n), 0),
+        charged: ent.reduce((s, n) => s + Game.charged(n), 0)
+      };
+    },
+
+    /**
+     * Record money handed over. `amount` is the new TOTAL for that player,
+     * not a delta -- a retry or a double-tap can never double-count.
+     */
+    setPaid(name, amount, by) {
+      const p = S.players[name];
+      if (!p) return Promise.reject(new Error(name + " isn't checked in"));
+      const v = Math.max(0, Math.round(Number(amount) || 0));
+      if (v > 1000) return Promise.reject(new Error("That's not a buy-in"));
+      const patch = { paid: v };
+      patch.paidAt = DB.now();
+      patch.paidBy = by || name;
+      return DB.save("payment for " + name, () => DB.update(BASE + "/players/" + name, patch));
+    },
+
+    /** Mark the whole outstanding balance settled. */
+    settle(name, by) { return Game.setPaid(name, Game.charged(name), by); },
 
     undoCheckIn(name) {
       return DB.save("remove " + name, () => DB.set(BASE + "/players/" + name, null));
@@ -558,7 +704,7 @@
         if (S.players[n]) return;
         patch[BASE + "/players/" + n] = {
           status: "active", place: null, buyins: 1, rebuys: 0,
-          late: false, bonus: true, joinedAt: DB.now()
+          late: false, bonus: true, joinedAt: DB.now(), paid: 0
         };
       });
       if (!Object.keys(patch).length) return Promise.resolve(0);
@@ -735,7 +881,9 @@
       const winner = act[0];
       const field = Game.fieldSize();
       const money = Game.pot();
-      const payTable = BPL.payoutTable(money.net, field, Game.splits(field));
+      const plan = Game.payouts(money.net, field);
+      if (plan.error) return Promise.reject(new Error("Payouts don't add up: " + plan.error));
+      const payTable = plan.table;
 
       const order = Game.finishOrder();                 // busted, best place first
       const finish = [{ place: 1, name: winner }].concat(order);

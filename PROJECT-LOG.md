@@ -113,6 +113,54 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 5 Sep — the door, and the money the way Nate says it
+
+Two asks from Jacob. Also asked about an AI layer; he pulled it himself —
+*"if it makes it more confusing than never mind"* — so nothing was built. The
+app stays deterministic.
+
+**Self check-in.** RSVP is unchanged. On the night you tap "I'm here" and you
+are in the field immediately — no host tap, no queue, because the queue is the
+thing this replaces and Nate is counting chips at that moment. The entry
+records `inBy`, so he can see which rows he did not make himself, and a
+check-in after the clock has started is flagged late on its own.
+
+**And the player says when they paid.** Jacob was explicit: *"instead of nate
+try to figure out who paid once or twice the player should be able to do
+that."* What you OWE is derived — buy-in plus any top-up, so a top-up puts you
+back in debt automatically. What you have PAID is a number, stored as a TOTAL
+rather than a delta, so a double-tap or a retry can never double-count. Nate
+gets a board: collected vs owed, the short list of who hasn't paid, one tap to
+settle anyone who handed over cash without touching their phone.
+
+**Money in dollars, not percentages.** *"it would be nice if nate could just
+say i want the kitty to be 120$, first place gets 200 and pay out to 4 people
+and the rest could just be automated."* Three boxes in Master Control: kitty $,
+1st gets $, places paid. Everything below 1st is derived — `BPL.payoutPlan`
+shapes the tail on the league's own split curve, scales it to what's left,
+rounds every place to $10, and pushes the drift into 2nd so the table sums to
+the pot exactly. The percentage controls stay underneath as the fallback.
+
+It REFUSES a plan it cannot pay honestly, and says which number to change:
+"2nd would get as much as 1st", "that leaves a place on $0", "first place is
+more than the pot". `setPrizePlan` validates against tonight's actual pot
+before storing, and `finalize()` refuses rather than writing a table that
+doesn't add up. A payout list that doesn't balance is worse than none.
+
+Firebase rules: `paid`/`paidAt`/`paidBy`/`inBy` on a player, and
+`kittyAmount`/`firstPrize`/`places` under config/money. Needs republishing.
+
+Tests: `door-test.js` — self check-in, self-payment, a top-up re-opening the
+debt, double-payment not double-counting, the host's owed board, the $120/$200/
+four-places plan end to end, and the refusals. `dress-rehearsal.js` now sends
+three players in through the door on alternate nights and reconciles
+paid + outstanding = charged = gross after every night.
+
+Verified: 20 complete nights — 30 self check-ins, 29 consolidations, 60
+top-ups, 20 post-break attempts blocked, 13 bounties, money reconciled every
+night, no page errors.
+
+
 ### 5 Sep — standings were still scoring an old game under the retired formula
 
 Jacob, after the first real game night: *"at least the standings are wrong

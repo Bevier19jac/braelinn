@@ -26,6 +26,16 @@
             "splits": {
               ".validate": "newData.hasChildren()"
             },
+            "_plan": "How the host said it out loud: a fixed kitty in dollars, what 1st takes, and how many places pay. Everything below 1st is derived.",
+            "kittyAmount": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000"
+            },
+            "firstPrize": {
+              ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 10000"
+            },
+            "places": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 12"
+            },
             "$other": {
               ".validate": false
             }
@@ -100,6 +110,19 @@
                 },
                 "joinedAt": {
                   ".validate": "newData.isNumber()"
+                },
+                "_money": "What a player OWES is derived from buyins/rebuys. What they have PAID is a number they or the host set -- a total, never a delta, so a retry cannot double-count.",
+                "paid": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"
+                },
+                "paidAt": {
+                  ".validate": "newData.isNumber()"
+                },
+                "paidBy": {
+                  ".validate": "newData.isString() && newData.val().length <= 40"
+                },
+                "inBy": {
+                  ".validate": "newData.isString() && newData.val().length <= 40"
                 },
                 "$other": {
                   ".validate": false
