@@ -253,6 +253,39 @@ const LEAGUE = {
   },
 
   /* --------------------------------------------------------------------------
+     RECAPS — the story of each night, keyed by date.
+
+     Written between games from the finalized record, not generated live: a
+     recap that fails has to fail on a Tuesday, not while twenty people are
+     waiting to be seated. Plain text; blank lines separate paragraphs.
+     ------------------------------------------------------------------------ */
+  recaps: {
+    "2026-09-03":
+      "Twelve came, eleven rebought. Read that again. Every single player at " +
+      "Nate's on opening night reached for a second $30 except Chris F — who " +
+      "then proceeded to outlast four men who'd bought themselves a whole extra " +
+      "life. Seventh place, one buy-in, and the moral high ground.\n\n" +
+
+      "Nate went out first. The host. In his own house. On the opening night of " +
+      "the season he runs. Twelve players, twelve finishing positions, and the " +
+      "man whose kitchen it is found the bottom of the list before anyone else. " +
+      "He rebought. It didn't help.\n\n" +
+
+      "Up top, Tod closed it out for $245 — and inherits something new: the first " +
+      "bounty of Season 7 rides on his head next time out. Twenty dollars to " +
+      "whoever knocks him out. Win again and it's forty. Tim got heads-up and took " +
+      "$165; Eric C and Guy rounded out the money.\n\n" +
+
+      "Greg played his first Braelinn night and finished 8th of 12 — mid-pack, " +
+      "rebought like everyone else, blended right in. Sprayberry managed 11th, " +
+      "which is one spot better than the host.\n\n" +
+
+      "$690 through the door. $140 to the season kitty. $550 across four places. " +
+      "Tod leads the table with 3,700, and everyone else has the rest of the " +
+      "season to do something about it."
+  },
+
+  /* --------------------------------------------------------------------------
      BOUNTY — $20 off the top of the night's pot, on the last winner's head.
      Whoever knocks them out takes it. Back-to-back wins stack it: two in a
      row and they carry $40, three and it's $60.
@@ -438,6 +471,55 @@ const BPL = {
       }
     }
     return { table: amounts };
+  },
+
+  /* ---------------------------------------------------------- KNOCKOUTS
+
+     Who has busted whom, across every finalized game. Only rows that
+     recorded a killer count — a night nobody tracked simply isn't in here,
+     which is honest and keeps the numbers meaningful.
+     --------------------------------------------------------------------- */
+  knockouts(results) {
+    const out = {};      // name -> { got: {victim:n}, gotBy: {killer:n}, kills, deaths }
+    const touch = n => (out[n] = out[n] || { got: {}, gotBy: {}, kills: 0, deaths: 0 });
+
+    BPL.gamesByDate(results).forEach(g => {
+      const rows = Array.isArray(g.finish) ? g.finish
+                 : Object.keys(g.finish || {}).map(k => g.finish[k]);
+      rows.forEach(r => {
+        if (!r || !r.outBy || r.outBy === r.name) return;
+        const k = touch(r.outBy), v = touch(r.name);
+        k.got[r.name] = (k.got[r.name] || 0) + 1;
+        k.kills += 1;
+        v.gotBy[r.outBy] = (v.gotBy[r.outBy] || 0) + 1;
+        v.deaths += 1;
+      });
+    });
+    return out;
+  },
+
+  /**
+   * The one line worth printing on a player's card: whoever has taken them
+   * out most. Needs at least two, because being busted by someone once is
+   * not a rivalry, it is a Thursday.
+   */
+  nemesisOf(results, name) {
+    const k = BPL.knockouts(results)[name];
+    if (!k) return null;
+    let best = null;
+    Object.keys(k.gotBy).forEach(n => {
+      if (!best || k.gotBy[n] > k.gotBy[best]) best = n;
+    });
+    return (best && k.gotBy[best] >= 2) ? { name: best, times: k.gotBy[best] } : null;
+  },
+
+  /** Head to head, both directions. */
+  headToHead(results, a, b) {
+    const k = BPL.knockouts(results);
+    return {
+      aGotB: ((k[a] || { got: {} }).got[b]) || 0,
+      bGotA: ((k[b] || { got: {} }).got[a]) || 0
+    };
   },
 
   ordinalOf(n) {

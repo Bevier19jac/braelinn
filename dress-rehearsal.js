@@ -38,7 +38,7 @@ const note = (night, what, detail) => {
  const B='http://localhost:8973/';
 
  console.log('Rehearsing ' + NIGHTS + ' complete game nights.\n');
- let consolidations = 0, rebuysTaken = 0, rebuysRefused = 0, walkIns = 0, bounties = 0, selfCheckIns = 0;
+ let knockouts = 0, consolidations = 0, rebuysTaken = 0, rebuysRefused = 0, walkIns = 0, bounties = 0, selfCheckIns = 0;
 
  for (let night = 1; night <= NIGHTS; night++) {
    const field = 8 + Math.floor(Math.random()*20);          // 8..27 turn up
@@ -213,9 +213,14 @@ const note = (night, what, detail) => {
        consolidations++;
      }
 
+     /* Most busts name a killer, some don't -- both must work. */
      await p.evaluate(async()=>{
        const a = Game.active();
-       await Game.confirmOut(a[Math.floor(Math.random()*a.length)]);
+       const victim = a[Math.floor(Math.random()*a.length)];
+       const others = a.filter(n => n !== victim);
+       const killer = (Math.random() < 0.8 && others.length)
+         ? others[Math.floor(Math.random()*others.length)] : null;
+       await Game.confirmOut(victim, null, killer);
      });
      await p.waitForTimeout(90);
    }
@@ -228,12 +233,15 @@ const note = (night, what, detail) => {
      if (playing) {
        if (potNow.bounty !== bt.amount) note(night,'bounty did not come off the pot',[potNow.bounty,bt.amount]);
        if (potNow.net !== potNow.gross - potNow.kitty - potNow.bounty) note(night,'pot arithmetic is wrong',potNow);
-       /* If the champion is the one still standing, they kept their own
-          bounty -- nobody to credit, and finalize is right to allow it. Only
-          probe the guard when somebody else won, because a probe that
-          succeeds would write the record out from under step 7. */
+       /* Confirming a bust now credits the bounty in the same answer, so by
+          the time the night is played out it is usually already settled.
+          Only chase it when it genuinely isn't -- and only probe the guard
+          when a probe would fail, because a probe that SUCCEEDS would write
+          the record out from under step 7. */
        const survivor = await p.evaluate(()=>Game.active()[0]);
-       if (survivor !== bt.name) {
+       const already = await p.evaluate(()=>Game.bountyClaimed());
+       if (already) { bounties++; }
+       else if (survivor !== bt.name) {
          const blocked = await p.evaluate(()=>Game.finalize().then(()=>'allowed').catch(e=>e.message));
          if (blocked === 'allowed') note(night,'finalized with an uncredited bounty');
          const killer = await p.evaluate(n=>Game.entrants().filter(x=>x!==n)[0], bt.name);
@@ -279,6 +287,14 @@ const note = (night, what, detail) => {
    if (money.c.paid + money.u.total !== money.c.charged)
      note(night,'paid + outstanding does not equal charged', money);
 
+   /* Knockouts: never yourself, never the winner, always somebody who played. */
+   const names = rows.map(r=>r.name);
+   const badKo = rows.filter(r => r.outBy && (r.outBy === r.name || names.indexOf(r.outBy) === -1));
+   if (badKo.length) note(night,'a knockout names someone impossible', badKo.slice(0,3).map(r=>r.name+'<-'+r.outBy));
+   const koCount = rows.filter(r=>r.outBy).length;
+   if (!koCount) note(night,'no knockouts were recorded at all');
+   knockouts += koCount;
+
    const winner = rows.find(r=>r.place===1);
    if (!winner || winner.name !== game.winner) note(night,'winner does not match place 1');
 
@@ -321,6 +337,7 @@ const note = (night, what, detail) => {
  console.log('  walk-ins added           : ' + walkIns);
  console.log('  bounties collected       : ' + bounties);
  console.log('  self check-ins           : ' + selfCheckIns);
+ console.log('  knockouts recorded       : ' + knockouts);
  console.log('  page errors              : ' + (errs.length ? JSON.stringify(errs.slice(0,3)) : 'none'));
  if (errs.length) problems.push('page errors: '+errs[0]);
 

@@ -836,8 +836,9 @@
     if (!b || !Admin.require()) return;
     const a = b.dataset.act;
 
-    if (a === "confirmOut") Game.confirmOut(b.dataset.n, b.dataset.id)
-      .then(place => { FX.eliminated(b.dataset.n, place); render(); });
+    if (a === "confirmOut") askKiller(b.dataset.n).then(killer =>
+      Game.confirmOut(b.dataset.n, b.dataset.id, killer)
+        .then(place => { FX.eliminated(b.dataset.n, place); render(); }));
     if (a === "dismiss")    Game.dismissReport(b.dataset.id).then(render);
     if (a === "gotoCheckin") {
       UI.tab("host");
@@ -888,9 +889,9 @@
     const b = e.target.closest("button[data-out]");
     if (!b || !Admin.require()) return;
     const n = b.dataset.out;
-    UI.confirm("Bust out " + n + "?",
-      "Records their finish. Places renumber automatically if anyone joins late.", "Confirm")
-      .then(ok => { if (ok) Game.confirmOut(n).then(place => { FX.eliminated(n, place); render(); }); });
+    askKiller(n).then(killer =>
+      Game.confirmOut(n, null, killer)
+        .then(place => { FX.eliminated(n, place); render(); }));
   });
 
   UI.on("finishList", "click", e => {
@@ -1201,6 +1202,52 @@
   }
 
   /* =============================================================== MONEY */
+  /**
+   * "Who got them?" — asked in the ten seconds after a bust, because that is
+   * the only moment anyone knows. Skippable: a bust nobody saw clearly is
+   * still a bust, and a wrong name is worse than no name.
+   *
+   * When the player is carrying the bounty this same answer credits it, so
+   * the host is never asked twice about one hand.
+   */
+  function askKiller(name) {
+    const alive = Game.active().filter(n => n !== name);
+    if (!alive.length) return Promise.resolve(null);
+
+    const t = Game.bountyTarget();
+    const onBounty = !!(t && t.name === name && t.amount && !Game.bountyClaimed());
+
+    return new Promise(resolve => {
+      const wrap = document.createElement("div");
+      wrap.className = "sheet-wrap";
+      wrap.innerHTML =
+        '<div class="sheet"><h3>Who knocked out ' + UI.esc(name) + '?</h3>' +
+        (onBounty
+          ? '<p class="tiny" style="color:var(--brass-hi);margin:0 0 10px">🎯 ' +
+            BPL.money(t.amount) + ' bounty goes to whoever it was.</p>'
+          : '<p class="tiny muted" style="margin:0 0 10px">Builds the head-to-head record. Skip if nobody is sure.</p>') +
+        '<input class="inp mb" data-filter placeholder="Filter…" aria-label="Filter">' +
+        '<div class="picklist" data-list>' +
+          alive.sort((a, b) => a.localeCompare(b)).map(n =>
+            '<button class="pickrow" data-v="' + UI.esc(n) + '"><b>' + UI.esc(n) + '</b></button>').join("") +
+        '</div>' +
+        '<button class="btn btn-block mt" data-skip>Nobody\'s sure — just mark them out</button></div>';
+      document.body.appendChild(wrap);
+      const done = v => { wrap.remove(); resolve(v); };
+      wrap.querySelector("[data-skip]").onclick = () => done(null);
+      wrap.onclick = e => { if (e.target === wrap) done(null); };
+      wrap.querySelectorAll(".pickrow").forEach(b => b.onclick = () => done(b.dataset.v));
+      const f = wrap.querySelector("[data-filter]");
+      f.oninput = () => {
+        const q = f.value.toLowerCase();
+        wrap.querySelectorAll(".pickrow").forEach(b => {
+          b.hidden = !!q && b.textContent.toLowerCase().indexOf(q) === -1;
+        });
+      };
+      setTimeout(() => f.focus(), 50);
+    });
+  }
+
   /* ------------------------------------------------------------- BOUNTY
 
      $20 rides on the last winner's head, stacking $20 a win while they keep

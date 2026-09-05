@@ -778,14 +778,42 @@
      * finishing place is derived from that (see finishOrder above), so late
      * entries and reinstatements renumber everyone correctly on their own.
      */
-    confirmOut(name, reportId) {
+    /**
+     * Record an elimination, and WHO did it.
+     *
+     * The killer is the one fact the app can never work out for itself, and
+     * it is the difference between a stat sheet and a story: without it the
+     * most a recap can say is "Nate went out first". With it, it can say
+     * Syd busted him for the third straight game. Optional -- a bust nobody
+     * saw clearly is still a bust -- but asked every time, because it is
+     * only knowable in the ten seconds after it happens.
+     *
+     * When the busted player is carrying the bounty, the same answer credits
+     * it. One question, not two.
+     */
+    confirmOut(name, reportId, killer) {
       if (Game.active().indexOf(name) === -1) return Promise.resolve(null);
+      const by = (killer && killer !== name && S.players[killer]) ? killer : null;
+
       const patch = {};
       patch[BASE + "/players/" + name + "/status"] = "out";
       patch[BASE + "/players/" + name + "/bustAt"] = DB.now();
+      if (by) patch[BASE + "/players/" + name + "/outBy"] = by;
       if (reportId) patch[BASE + "/reports/" + reportId] = null;
+
+      const t = Game.bountyTarget();
+      if (by && t && t.name === name && t.amount && !Game.bountyClaimed()) {
+        patch[BASE + "/bounty"] = { target: name, amount: t.amount, wonBy: by, at: DB.now() };
+      }
+
       return DB.save(name + " out", () => DB.multi(patch))
         .then(() => Game.placeOf(name));
+    },
+
+    /** Who knocked this player out tonight, if anyone said. */
+    outBy(name) {
+      const p = S.players[name];
+      return (p && p.outBy) || null;
     },
 
     /** Put someone back in — undoes a mistaken elimination. */
@@ -793,6 +821,7 @@
       const patch = {};
       patch[BASE + "/players/" + name + "/status"] = "active";
       patch[BASE + "/players/" + name + "/bustAt"] = null;
+      patch[BASE + "/players/" + name + "/outBy"] = null;   // they're not out any more
       return DB.save("reinstate " + name, () => DB.multi(patch));
     },
 
@@ -921,6 +950,7 @@
           points: BPL.pointsFor(f.place, field, itm),
           rebuys: p.rebuys || 0,
           late: !!p.late,
+          outBy: p.outBy || null,
           winnings: win + bnty,
           bounty: bnty,
           itm: itm

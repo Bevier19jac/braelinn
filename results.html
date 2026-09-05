@@ -137,6 +137,14 @@
               '<span class="mf-a">' + (r[1] < 0 ? "−" + BPL.money(-r[1]) : BPL.money(r[1])) + '</span>' +
             '</div>').join("") +
         '</div>' +
+        /* The story of the night, when there is one. Written between games
+           and shipped as content -- nothing generated while people wait. */
+        ((LEAGUE.recaps || {})[g.date]
+          ? '<div class="recap"><div class="recap-h">The Night</div>' +
+            String(LEAGUE.recaps[g.date]).split(/\n\s*\n/)
+              .map(para => '<p>' + UI.esc(para.trim()) + '</p>').join("") +
+            '</div>'
+          : '') +
         '<div class="tbl-scroll"><table class="tbl">' +
         '<thead><tr><th>#</th><th>Player</th><th>Pts</th><th>$</th></tr></thead><tbody>' +
         rows.map(r =>
@@ -144,7 +152,8 @@
           '<td class="num">' + r.place + '</td>' +
           '<td>' + UI.esc(r.name) +
             (r.rebuys ? ' <span class="tiny muted">+' + r.rebuys + 'r</span>' : '') +
-            (r.bounty ? ' <span class="bt-tag">🎯 ' + BPL.money(r.bounty) + '</span>' : '') + '</td>' +
+            (r.bounty ? ' <span class="bt-tag">🎯 ' + BPL.money(r.bounty) + '</span>' : '') +
+            (r.outBy ? '<small class="ko">out to ' + UI.esc(r.outBy) + '</small>' : '') + '</td>' +
           '<td class="num">' + BPL.chips(r.points) +
             (r.itm ? '<small class="itm">+' + (LEAGUE.points.itmBonus || 0) + '</small>' : '') + '</td>' +
           '<td class="num">' + (r.winnings ? BPL.money(r.winnings) : "—") + '</td></tr>').join("") +

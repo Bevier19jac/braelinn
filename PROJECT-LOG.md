@@ -113,6 +113,51 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 5 Sep — knockouts, head-to-heads, and the story of the night
+
+Jacob pushed back on the AI answer: *"so you dont think adding a layer of ai
+would make the app fun in a way?"* He was right and I was wrong. I had answered
+whether AI should RUN the tournament — it shouldn't, Nate has to audit every
+number at 1am — and treated "fun" as the same question. It isn't. Fun is
+exactly where a model belongs, because when it's wrong nothing breaks.
+
+**Knockouts.** Confirming a bust now asks who did it — a picker of whoever is
+still in, skippable, because a bust nobody saw clearly is still a bust and a
+wrong name is worse than no name. It is the one fact the app can never derive,
+and it is only knowable in the ten seconds after it happens.
+
+The same answer credits the bounty when the busted player is carrying one, so
+the host is never asked twice about one hand. `outBy` lands on the player and
+on the permanent record; reinstating clears it.
+
+**Head-to-heads.** `BPL.knockouts()` builds who-busted-whom across every
+finalized game. The players page shows a nemesis ("Nemesis: Syd ×3") and who
+you own — only at two or more, because being busted by somebody once is not a
+rivalry, it's a Thursday. Results shows "out to <name>" under each finisher.
+
+**The recap.** `LEAGUE.recaps`, keyed by date, rendered on each game in
+Results. Written BETWEEN games from the finalized record, shipped as content
+in the repo — a recap that fails has to fail on a Tuesday, not while twenty
+people are waiting to be seated. No API key, no proxy, nothing new that can
+break on game night. Event 1 is written; the 15th gets one after it's played.
+
+The honest limit, worth saying: the Sept 3 recap could only say "Nate went out
+first", because that night has no knockout data. From the 15th it can say who
+busted whom, and it gets much better.
+
+Firebase rules: `outBy` on a player and on a finish row. Needs republishing.
+
+Tests: `knockout-test.js` — the question at the bust, skipping, the bounty
+credited by the same answer, reinstating clearing it, the record carrying it,
+head-to-heads, the players page, and the recap rendering. `dress-rehearsal.js`
+now names a killer on ~80% of busts and checks no knockout ever names the
+victim themselves or somebody who did not play.
+
+Verified: 20 complete nights — 273 knockouts recorded, 14 bounties (now
+credited by the same answer that records the bust), 30 self check-ins, 29
+consolidations, money reconciled every night, no page errors.
+
+
 ### 5 Sep — the door, and the money the way Nate says it
 
 Two asks from Jacob. Also asked about an AI layer; he pulled it himself —

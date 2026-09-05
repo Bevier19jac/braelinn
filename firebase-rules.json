@@ -124,6 +124,10 @@
                 "inBy": {
                   ".validate": "newData.isString() && newData.val().length <= 40"
                 },
+                "_outBy": "Who knocked them out. The one fact the app can never derive -- it turns a stat sheet into a story.",
+                "outBy": {
+                  ".validate": "newData.isString() && newData.val().length <= 40"
+                },
                 "$other": {
                   ".validate": false
                 }
@@ -256,6 +260,9 @@
                 },
                 "late": {
                   ".validate": "newData.isBoolean()"
+                },
+                "outBy": {
+                  ".validate": "newData.isString() && newData.val().length <= 40"
                 },
                 "$other": {
                   ".validate": false

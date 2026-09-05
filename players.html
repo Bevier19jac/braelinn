@@ -89,9 +89,12 @@
 
   let agg = null, q = "";
 
+  let rawResults = {};
+
   function render() {
     const byName = {};
     if (agg) agg.players.forEach(p => { byName[p.name] = p; });
+    const ko = BPL.knockouts(rawResults);
 
     const list = LEAGUE.standings.slice()
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -115,7 +118,26 @@
             '<span><b>' + s.wins + '</b>wins</span>' +
             '<span><b>' + (s.avgPlace ? s.avgPlace.toFixed(1) : "—") + '</b>avg</span>'
           : '<span class="rc-none">No games yet</span>') +
-        '</div></div>';
+        '</div>' +
+        /* The line worth having on a card: who keeps taking you out, and
+           who you keep taking out. Only shown once it's a pattern -- being
+           busted by someone once is not a rivalry, it's a Thursday. */
+        (() => {
+          const k = ko[p.name];
+          if (!k || (!k.kills && !k.deaths)) return "";
+          const nem = BPL.nemesisOf(rawResults, p.name);
+          const bits = [];
+          if (nem) bits.push('<span class="ko-bad">Nemesis: <b>' + UI.esc(nem.name) +
+                             '</b> ×' + nem.times + '</span>');
+          let victim = null;
+          Object.keys(k.got).forEach(n => { if (!victim || k.got[n] > k.got[victim]) victim = n; });
+          if (victim && k.got[victim] >= 2)
+            bits.push('<span class="ko-good">Owns <b>' + UI.esc(victim) + '</b> ×' + k.got[victim] + '</span>');
+          if (!bits.length && k.kills)
+            bits.push('<span class="ko-good"><b>' + k.kills + '</b> knockout' + (k.kills === 1 ? '' : 's') + '</span>');
+          return bits.length ? '<div class="rc-ko">' + bits.join("") + '</div>' : "";
+        })() +
+        '</div>';
     }).join("");
   }
 
@@ -123,7 +145,7 @@
     q = e.target.value.trim().toLowerCase(); render();
   });
 
-  DB.on("results", v => { agg = BPL.aggregate(v || {}); render(); });
+  DB.on("results", v => { rawResults = v || {}; agg = BPL.aggregate(rawResults); render(); });
   render();
 })();
 </script>
