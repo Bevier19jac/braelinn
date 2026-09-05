@@ -657,6 +657,12 @@
   let showAllRsvp = false;
   let showEveryone = false;
 
+  /** Has this player appeared in any finalized game? */
+  function hasPlayed(name) {
+    const row = BPL.aggregate(results).players.find(p => p.name === name);
+    return !!(row && row.events > 0);
+  }
+
 
   function renderMyRsvp() {
     const box = document.getElementById("myRsvp");
@@ -765,7 +771,10 @@
 
     const list = LEAGUE.standings.filter(p => {
       if (q) return p.name.toLowerCase().includes(q) || (p.fullName || "").toLowerCase().includes(q);
-      return showAllRsvp || p.reg || rsvpState[p.name];
+      /* Regulars, anyone who has answered, and anyone who has actually
+         played -- a man who turned up last month should not be hiding
+         behind "+ more on the invite list". */
+      return showAllRsvp || p.reg || rsvpState[p.name] || hasPlayed(p.name);
     });
 
     const hidden = LEAGUE.standings.length - list.length;

@@ -113,6 +113,19 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 5 Sep — Matt McCoy on the roster
+
+Roster is 37. Short name is **"Matt M"** — "Matt" alone would collide with Matt
+Therriault, and the short name is the database key every RSVP, check-in and
+result is filed under. Marked `reg: true`, so he sits in the default RSVP list
+rather than behind "+ more on the invite list".
+
+Also fixed while in there: the RSVP list showed regulars and anyone who had
+answered, but NOT anyone who had actually played. Greg played on the 3rd and
+was still hiding behind the "more" toggle. It now includes anyone with a
+finished game, so "active" maintains itself.
+
+
 ### 5 Sep — knockouts, head-to-heads, and the story of the night
 
 Jacob pushed back on the AI answer: *"so you dont think adding a layer of ai

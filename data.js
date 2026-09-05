@@ -136,7 +136,11 @@ const LEAGUE = {
     { name: "Jake",       fullName: "Jake Westfall",    events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
     { name: "Sprayberry", fullName: "Tyler Sprayberry", events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
     { name: "Larry",      fullName: "Larry Stewart",    events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
-    { name: "Greg",       fullName: "Gregory James Lee",events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" }
+    { name: "Greg",       fullName: "Gregory James Lee",events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
+    /* Short name is "Matt M" -- "Matt" alone would collide with Matt
+       Therriault, and the short name is the database key every RSVP,
+       check-in and result is filed under. */
+    { name: "Matt M",     fullName: "Matt McCoy",       reg: true, events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" }
   ],
 
   /* --------------------------------------------------------------------------

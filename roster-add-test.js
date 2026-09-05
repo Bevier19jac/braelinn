@@ -10,7 +10,7 @@ const srv=http.createServer((q,r)=>{let p=decodeURIComponent(q.url.split('?')[0]
  r.writeHead(200,{'Content-Type':T[path.extname(f)]||'text/plain'});fs.createReadStream(f).pipe(r);});
 const say=(k,v)=>console.log('  '+k+': '+(typeof v==='string'?v:JSON.stringify(v)));
 const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!==undefined?'  '+JSON.stringify(d):''));if(!c)fails.push(k)};
-const NEW = ['Larry','Greg'];
+const NEW = ['Larry','Greg','Matt M'];
 (async()=>{await new Promise(r=>srv.listen(8975,r));
  const b=await chromium.launch();const c=await b.newContext({viewport:{width:390,height:844}});
  await c.route('**/gstatic.com/**',r=>r.abort());
@@ -25,6 +25,8 @@ const NEW = ['Larry','Greg'];
  say('size', roster.length);
  ok('larry_is_there', roster.some(x=>x.n==='Larry' && x.f==='Larry Stewart'));
  ok('greg_is_there', roster.some(x=>x.n==='Greg' && x.f==='Gregory James Lee'));
+ ok('matt_m_is_there', roster.some(x=>x.n==='Matt M' && x.f==='Matt McCoy'));
+ ok('and_did_not_collide_with_matt_t', roster.some(x=>x.n==='Matt T' && x.f==='Matt Therriault'));
  ok('short_names_unique', new Set(roster.map(x=>x.n)).size===roster.length);
  ok('no_forbidden_key_chars', roster.every(x=>!/[.#$\[\]/]/.test(x.n)));
  ok('both_on_the_signin_screen', await p.locator('.si-row[data-n="Larry"]').count()===1
@@ -34,6 +36,10 @@ const NEW = ['Larry','Greg'];
  ok('findable_by_full_name', await p.locator('.si-row[data-n="Larry"]').count()===1);
  await p.fill('#siFilter','gregory'); await p.waitForTimeout(250);
  ok('greg_findable_by_full_name', await p.locator('.si-row[data-n="Greg"]').count()===1);
+ await p.fill('#siFilter','mccoy'); await p.waitForTimeout(250);
+ ok('matt_m_findable_by_full_name', await p.locator('.si-row[data-n="Matt M"]').count()===1);
+ await p.fill('#siFilter','matt'); await p.waitForTimeout(250);
+ ok('both_matts_found', await p.locator('.si-row').count()===2, await p.locator('.si-row').count());
  await p.fill('#siFilter','');
 
  console.log('\n== EVERY EXISTING RSVP IS UNTOUCHED ==');
