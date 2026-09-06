@@ -113,6 +113,52 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 6 Sep — the knockout question moved to the player, plus season extras
+
+**Jacob: "is it going to be confusing for Nate to enter who knocked out who?"**
+Yes, and he was right. It was a sheet the host had to dismiss on every bust,
+twenty times a night, at exactly the moments he is busiest — a tax on the one
+man at that table with no spare hands.
+
+**It belongs to the player who just busted.** They know who got them, they are
+out of the hand with nothing else to do, and it is already in their flow: they
+tap "I'm out" on their own seat and pick a name (or "Rather not say"). The
+answer rides on the report; the host's confirm is one tap again. `confirmOut`
+takes the player's answer unless the host names somebody else.
+
+The one exception is the bounty: real money, so if nobody has already said,
+Nate still gets asked. `hostConfirmOut` decides that; everywhere else he is
+left alone. Also fixed: the killer sheet used to stack on top of the player's
+open seat sheet — close yours first.
+
+**High hand of the season.** Claimed from your own seat: pick a category
+(royal flush down to one pair) plus whatever you actually said — "quad 8s".
+Category IS the ranking, because nobody types five cards at 11pm. Only a
+BETTER hand replaces one already standing, so a later claim cannot quietly
+demote the quads somebody hit at level 3. Two royal flushes in a season are a
+genuine tie and are shown as one.
+
+**Most knockouts.** `BPL.knockoutBoard()` — derived from the same `outBy` data,
+nothing entered twice. Both live in a new "The Season" section on Standings,
+hidden until there is something to show. It says plainly that it counts only
+busts where somebody said who did it.
+
+**The news banner expires on its own.** Jacob: *"season 7 kicked off sept 3 has
+passed so that announcement is old."* It had been advertising a night that had
+already happened. Announcements now carry `until`, and `activeAnnouncement()`
+drops anything past it whether or not somebody remembered to switch it off —
+the same stale-site problem as a stale game date, which this project has now
+been bitten by three times. `edge-test` checks every live announcement has an
+expiry, and that it actually disappears the day after.
+
+Firebase rules: `by` on a report, `highHand` under the live game. Republish.
+
+Tests: `season-test.js` (claiming, a worse hand refused, a better one taking
+it, the record, the season board, the standings render, and staying hidden
+when empty). `knockout-test.js` rewritten around the player answering.
+`dress-rehearsal.js` now reports then confirms, the way a real night runs.
+
+
 ### 5 Sep — Matt McCoy on the roster
 
 Roster is 37. Short name is **"Matt M"** — "Matt" alone would collide with Matt

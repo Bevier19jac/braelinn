@@ -145,6 +145,10 @@
                 "at": {
                   ".validate": "newData.isNumber()"
                 },
+                "_by": "Who the player says knocked them out. The player answers, not the host -- they know, and the host is busy.",
+                "by": {
+                  ".validate": "newData.isString() && newData.val().length <= 40"
+                },
                 "$other": {
                   ".validate": false
                 }
@@ -160,6 +164,24 @@
               },
               "amount": {
                 ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "_highHand": "Best hand of the night. Category only -- nobody types five cards at 11pm -- claimed by whoever hit it.",
+            "highHand": {
+              "name": {
+                ".validate": "newData.isString() && newData.val().length <= 40"
+              },
+              "cat": {
+                ".validate": "newData.isString() && newData.val().matches(/^(royal|sflush|quads|boat|flush|straight|trips|twopair|pair)$/)"
+              },
+              "note": {
+                ".validate": "newData.isString() && newData.val().length <= 60"
               },
               "at": {
                 ".validate": "newData.isNumber()"

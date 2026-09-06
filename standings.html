@@ -113,6 +113,14 @@
     <p class="tiny muted mt" id="pointsNote"></p>
   </section>
 
+  <!-- Two things the points table can't say: the best hand anyone has hit
+       all season, and who has done the most damage. -->
+  <section id="extraSec" hidden>
+    <div class="sec-head"><h2>The Season</h2></div>
+    <div class="card" id="highHandCard"></div>
+    <div class="card mt" id="koBoard"></div>
+  </section>
+
 
 </div>
 
@@ -215,7 +223,54 @@
 
   document.getElementById("btnToggle").addEventListener("click", () => { showAll = !showAll; render(); });
 
-  DB.on("results", v => { agg = BPL.aggregate(v || {}); render(); });
+  /* ---------------------------------------------------- THE SEASON EXTRAS
+     The best hand anyone has hit, and who has done the most damage. Both
+     derive from the finalized records -- nothing here is entered twice. */
+  function renderExtras(results) {
+    const sec = document.getElementById("extraSec");
+    const hh = BPL.highHand(results);
+    const board = BPL.knockoutBoard(results);
+    if (!hh && !board.length) { sec.hidden = true; return; }
+    sec.hidden = false;
+
+    const hhCard = document.getElementById("highHandCard");
+    hhCard.hidden = !hh;
+    if (hh) {
+      hhCard.innerHTML =
+        '<div class="ex-h">High hand of the season</div>' +
+        '<div class="ex-hand">' + UI.esc(hh.label) + '</div>' +
+        '<div class="ex-who">' + hh.holders.map(h =>
+          '<span>' + UI.avatar(h.name, "sm") + '<b>' + UI.esc(h.name) + '</b>' +
+          '<small>' + UI.esc(BPL.fmtShort(h.date)) +
+            (h.note ? ' · ' + UI.esc(h.note) : '') + '</small></span>').join("") +
+        '</div>' +
+        (hh.holders.length > 1
+          ? '<p class="tiny muted" style="margin:10px 0 0">' + hh.holders.length +
+            ' players tied — nobody has beaten it.</p>' : '');
+    }
+
+    const ko = document.getElementById("koBoard");
+    ko.hidden = !board.length;
+    if (board.length) {
+      const top = board.slice(0, 8);
+      const most = top[0].kills;
+      ko.innerHTML =
+        '<div class="ex-h">Most knockouts</div>' +
+        '<div class="ko-board">' + top.map((r, i) =>
+          '<div class="ko-line' + (i === 0 ? " lead" : "") + '">' +
+            '<span class="ko-n">' + (i + 1) + '</span>' +
+            UI.avatar(r.name, "sm") +
+            '<span class="ko-name">' + UI.esc(r.name) + '</span>' +
+            '<span class="ko-bar"><i style="width:' +
+              Math.round(r.kills / most * 100) + '%"></i></span>' +
+            '<b class="ko-k">' + r.kills + '</b>' +
+          '</div>').join("") + '</div>' +
+        '<p class="tiny muted" style="margin:10px 0 0">Counts only busts where ' +
+        'somebody said who did it.</p>';
+    }
+  }
+
+  DB.on("results", v => { agg = BPL.aggregate(v || {}); renderExtras(v || {}); render(); });
 })();
 </script>
 </body>

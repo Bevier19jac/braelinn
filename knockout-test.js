@@ -36,29 +36,47 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
  await p.goto(B+'game.html',{waitUntil:'networkidle'}); await p.waitForTimeout(1200);
  await p.click('#btnMaster'); await p.waitForTimeout(400);
 
- console.log('\n== CONFIRMING A BUST ASKS WHO GOT THEM ==');
+ console.log('\n== THE HOST IS NOT ASKED. ONE TAP, DONE. ==');
  const players = p.locator('.tabs button[data-tab="players"]');
  if (await players.count()) { await players.click(); await p.waitForTimeout(400); }
- await p.locator('button[data-out="Guy"]').click(); await p.waitForTimeout(500);
- ok('the_question_is_asked', (await p.locator('.sheet h3').innerText()).includes('Who knocked out Guy'));
- ok('only_live_players_offered', await p.locator('.sheet .pickrow').count()===5,
-    await p.locator('.sheet .pickrow').count());
- ok('skipping_is_offered', await p.locator('.sheet [data-skip]').count()===1);
- await p.locator('.sheet .pickrow', {hasText:'Jacob'}).first().click(); await p.waitForTimeout(900);
+ await p.locator('button[data-out="Guy"]').click(); await p.waitForTimeout(900);
+ ok('no_sheet_in_his_way', await p.locator('.sheet').count()===0);
  ok('he_is_out', await p.evaluate(()=>Game.active().indexOf('Guy')===-1));
- ok('and_it_recorded_who', await p.evaluate(()=>Game.outBy('Guy'))==='Jacob');
+ ok('and_no_killer_invented', await p.evaluate(()=>Game.outBy('Guy'))===null);
 
- console.log('\n== SKIPPING IS FINE ==');
- await p.locator('button[data-out="Aaron"]').click(); await p.waitForTimeout(500);
- await p.locator('.sheet [data-skip]').click(); await p.waitForTimeout(900);
- ok('still_busts_them', await p.evaluate(()=>Game.active().indexOf('Aaron')===-1));
- ok('with_no_killer_recorded', await p.evaluate(()=>Game.outBy('Aaron'))===null);
+ console.log('\n== THE PLAYER SAYS WHO GOT THEM, FROM THEIR OWN SEAT ==');
+ await p.evaluate(()=>{ localStorage.setItem('bpl_me','Aaron'); Admin.lock(); sessionStorage.removeItem('bpl_admin_ok'); });
+ await p.goto(B+'game.html',{waitUntil:'networkidle'}); await p.waitForTimeout(1200);
+ await p.locator('.bseat.mine').click(); await p.waitForTimeout(500);
+ await p.locator('#ssBust [data-imout]').click(); await p.waitForTimeout(300);
+ await p.locator('.sheet [data-yes]').click(); await p.waitForTimeout(600);
+ ok('only_one_sheet_at_a_time', await p.locator('.sheet').count()===1, await p.locator('.sheet').count());
+ ok('they_are_asked_who_got_them', (await p.locator('.sheet h3').last().innerText()).includes('Who got you'));
+ ok('rather_not_say_is_offered', (await p.locator('.sheet [data-skip]').last().innerText()).includes('Rather not say'));
+ await p.locator('.sheet .pickrow', {hasText:'Jacob'}).last().click(); await p.waitForTimeout(1000);
+ ok('the_report_carries_it', await p.evaluate(()=>Game.reportedBy('Aaron'))==='Jacob');
+ ok('but_they_are_not_out_yet', await p.evaluate(()=>Game.active().indexOf('Aaron')!==-1));
+
+ console.log('\n== AND THE HOST JUST CONFIRMS IT ==');
+ await p.evaluate(()=>{ localStorage.setItem('bpl_me','Nate'); sessionStorage.setItem('bpl_admin_ok','1'); });
+ await p.goto(B+'game.html',{waitUntil:'networkidle'}); await p.waitForTimeout(1200);
+ /* The action queue lives on the page itself, not in the drawer -- so leave
+    the drawer shut, the way Nate would when he's watching the room. */
+ await p.locator('#queue button[data-act="confirmOut"]').first().click(); await p.waitForTimeout(1000);
+ ok('confirmed_without_a_question', await p.locator('.sheet').count()===0);
+ ok('aaron_is_out', await p.evaluate(()=>Game.active().indexOf('Aaron')===-1));
+ ok('with_the_players_answer', await p.evaluate(()=>Game.outBy('Aaron'))==='Jacob');
 
  console.log('\n== THE BOUNTY IS CREDITED BY THE SAME ANSWER ==');
  const t = await p.evaluate(()=>Game.bountyTarget());
  say('bounty', t);
  ok('tod_carries_it', t && t.name==='Tod' && t.amount===20, t);
- await p.locator('button[data-out="Tod"]').click(); await p.waitForTimeout(500);
+ /* Back into Master Control to reach the player list. */
+ await p.click('#btnMaster'); await p.waitForTimeout(400);
+ const pl2 = p.locator('.tabs button[data-tab="players"]');
+ if (await pl2.count()) { await pl2.click(); await p.waitForTimeout(400); }
+ await p.locator('button[data-out="Tod"]').click(); await p.waitForTimeout(700);
+ ok('the_host_IS_asked_when_money_is_on_it', await p.locator('.sheet').count()===1);
  ok('the_sheet_says_so', (await p.locator('.sheet').innerText()).includes('bounty goes to'));
  await p.locator('.sheet .pickrow', {hasText:'Syd'}).first().click(); await p.waitForTimeout(1000);
  ok('one_question_not_two', await p.evaluate(()=>Game.bountyClaimed()));
@@ -67,10 +85,9 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
 
  console.log('\n== REINSTATING CLEARS IT ==');
  await p.evaluate(()=>Game.reinstate('Aaron')); await p.waitForTimeout(500);
+ ok('back_in_means_no_killer', await p.evaluate(()=>Game.outBy('Aaron'))===null);
  await p.evaluate(()=>Game.confirmOut('Aaron', null, 'Nate')); await p.waitForTimeout(500);
  ok('re-busting_records_the_new_answer', await p.evaluate(()=>Game.outBy('Aaron'))==='Nate');
- await p.evaluate(()=>Game.reinstate('Aaron')); await p.waitForTimeout(500);
- ok('back_in_means_no_killer', await p.evaluate(()=>Game.outBy('Aaron'))===null);
 
  console.log('\n== IT LANDS ON THE PERMANENT RECORD ==');
  const rec = await p.evaluate(async()=>{
@@ -78,7 +95,11 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
    return Game.finalize();
  });
  say('finish', rec.finish.map(r=>r.place+':'+r.name+(r.outBy?' <- '+r.outBy:'')));
- ok('killers_on_the_record', rec.finish.some(r=>r.outBy==='Jacob') && rec.finish.some(r=>r.outBy==='Syd'));
+ const killers = [...new Set(rec.finish.filter(r=>r.outBy).map(r=>r.outBy))];
+ say('killers', killers);
+ ok('killers_on_the_record', killers.includes('Syd') && killers.length >= 2, killers);
+ ok('a_bust_with_nobody_named_is_still_a_bust',
+    rec.finish.some(r=>r.place>1 && !r.outBy) && rec.finish.length===6);
  ok('winner_has_none', !rec.finish.find(r=>r.place===1).outBy);
 
  console.log('\n== WHICH BECOMES A HEAD-TO-HEAD RECORD ==');

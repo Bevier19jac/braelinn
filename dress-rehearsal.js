@@ -213,14 +213,16 @@ const note = (night, what, detail) => {
        consolidations++;
      }
 
-     /* Most busts name a killer, some don't -- both must work. */
+     /* The player reports who got them; the host just confirms. Some say
+        nothing -- both paths must work. */
      await p.evaluate(async()=>{
        const a = Game.active();
        const victim = a[Math.floor(Math.random()*a.length)];
        const others = a.filter(n => n !== victim);
        const killer = (Math.random() < 0.8 && others.length)
          ? others[Math.floor(Math.random()*others.length)] : null;
-       await Game.confirmOut(victim, null, killer);
+       const id = await Game.report(victim, "out", killer);   // the player
+       await Game.confirmOut(victim, id);                     // the host, one tap
      });
      await p.waitForTimeout(90);
    }

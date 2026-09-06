@@ -836,9 +836,7 @@
     if (!b || !Admin.require()) return;
     const a = b.dataset.act;
 
-    if (a === "confirmOut") askKiller(b.dataset.n).then(killer =>
-      Game.confirmOut(b.dataset.n, b.dataset.id, killer)
-        .then(place => { FX.eliminated(b.dataset.n, place); render(); }));
+    if (a === "confirmOut") hostConfirmOut(b.dataset.n, b.dataset.id);
     if (a === "dismiss")    Game.dismissReport(b.dataset.id).then(render);
     if (a === "gotoCheckin") {
       UI.tab("host");
@@ -889,9 +887,7 @@
     const b = e.target.closest("button[data-out]");
     if (!b || !Admin.require()) return;
     const n = b.dataset.out;
-    askKiller(n).then(killer =>
-      Game.confirmOut(n, null, killer)
-        .then(place => { FX.eliminated(n, place); render(); }));
+    hostConfirmOut(n, null);
   });
 
   UI.on("finishList", "click", e => {
@@ -1060,6 +1056,7 @@
             (Photos.has(name) ? "Change photo" : "Add a photo") + '</button>' +
         '</div>' +
         (mine ? '<div class="ss-money" id="ssMoney"></div>' : '') +
+        (mine ? '<div class="ss-hh" id="ssHigh"></div>' : '') +
         (mine ? '<div class="ss-bust" id="ssBust"></div>' : '') +
         '<label class="tiny muted" for="ssChips">Chip count</label>' +
         '<input class="inp" id="ssChips" type="number" inputmode="numeric" min="0" step="25" ' +
@@ -1109,6 +1106,32 @@
       };
     }
 
+    /* The best hand of the night, claimed by whoever hit it. Category only
+       -- nobody wants to type five cards at 11pm -- with room for what they
+       actually said. Only a better hand can replace one already standing. */
+    const hh = wrap.querySelector("#ssHigh");
+    if (hh) {
+      const cur = Game.highHand();
+      hh.innerHTML =
+        '<div class="hh-row"><span class="hh-l">High hand' +
+          (cur ? '<small>' + UI.esc(cur.name) + ' — ' + UI.esc(BPL.handLabel(cur.cat)) +
+                 (cur.note ? ' (' + UI.esc(cur.note) + ')' : '') + '</small>'
+               : '<small>Nobody has claimed it yet</small>') +
+        '</span>' +
+        '<button class="btn btn-sm" data-hh type="button">' +
+          (cur && cur.name === name ? "Change" : "I hit one") + '</button></div>';
+      hh.querySelector("[data-hh]").onclick = () => {
+        UI.pick("What did you hit?", BPL.HANDS.map(h => ({ value: h.key, label: h.label })))
+          .then(cat => {
+            if (!cat) return;
+            const note = window.prompt("Anything to add? (e.g. \"quad 8s\") — optional", "") || "";
+            Game.claimHighHand(name, cat, note).then(
+              () => { UI.toast("High hand: " + BPL.handLabel(cat), "ok"); close(); render(); },
+              err => UI.toast(err.message, "bad"));
+          });
+      };
+    }
+
     /* Busting out, from your own seat. It sends a report -- the host confirms
        it -- so a mis-tap at the table costs nobody a finishing place. This
        used to live in a panel that no longer exists on this page, which meant
@@ -1133,9 +1156,17 @@
         UI.confirm("Bust out?", "Sends a report to the host. Nothing is recorded until they confirm.", "I'm out")
           .then(yes => {
             if (!yes) return;
-            Game.report(name, "out").then(
-              () => { UI.toast("Reported — the host will confirm it", "ok"); close(); render(); },
-              err => UI.toast(err.message, "bad"));
+            /* You know who got you. Nate doesn't, and he's busy.
+               Close your own seat first -- two stacked sheets is a mess. */
+            close();
+            askKiller(name, true).then(killer =>
+              Game.report(name, "out", killer).then(
+                () => {
+                  UI.toast(killer ? "Reported — " + killer + " gets the credit"
+                                  : "Reported — the host will confirm it", "ok");
+                  render();
+                },
+                err => UI.toast(err.message, "bad")));
           });
       };
     }
@@ -1210,7 +1241,23 @@
    * When the player is carrying the bounty this same answer credits it, so
    * the host is never asked twice about one hand.
    */
-  function askKiller(name) {
+  /**
+   * Confirm a bust as the host. One tap — the question about who got them
+   * belongs to the player who just busted, not to the man running the night.
+   * The exception is the bounty: real money, so it is worth the interruption
+   * when nobody has already said.
+   */
+  function hostConfirmOut(name, reportId) {
+    const t = Game.bountyTarget();
+    const needBounty = !!(t && t.name === name && t.amount &&
+                          !Game.bountyClaimed() && !Game.reportedBy(name));
+    const ask = needBounty ? askKiller(name) : Promise.resolve(null);
+    return ask.then(killer =>
+      Game.confirmOut(name, reportId, killer)
+        .then(place => { FX.eliminated(name, place); render(); }));
+  }
+
+  function askKiller(name, mine) {
     const alive = Game.active().filter(n => n !== name);
     if (!alive.length) return Promise.resolve(null);
 
@@ -1221,17 +1268,21 @@
       const wrap = document.createElement("div");
       wrap.className = "sheet-wrap";
       wrap.innerHTML =
-        '<div class="sheet"><h3>Who knocked out ' + UI.esc(name) + '?</h3>' +
+        '<div class="sheet"><h3>' + (mine ? "Who got you?" : "Who knocked out " + UI.esc(name) + "?") + '</h3>' +
         (onBounty
           ? '<p class="tiny" style="color:var(--brass-hi);margin:0 0 10px">🎯 ' +
-            BPL.money(t.amount) + ' bounty goes to whoever it was.</p>'
-          : '<p class="tiny muted" style="margin:0 0 10px">Builds the head-to-head record. Skip if nobody is sure.</p>') +
+            BPL.money(t.amount) + (mine ? ' of your bounty goes to whoever it was.'
+                                        : ' bounty goes to whoever it was.') + '</p>'
+          : '<p class="tiny muted" style="margin:0 0 10px">' +
+            (mine ? "Settles the score for the record. Skip it if you'd rather not say."
+                  : "Builds the head-to-head record. Skip if nobody is sure.") + '</p>') +
         '<input class="inp mb" data-filter placeholder="Filter…" aria-label="Filter">' +
         '<div class="picklist" data-list>' +
           alive.sort((a, b) => a.localeCompare(b)).map(n =>
             '<button class="pickrow" data-v="' + UI.esc(n) + '"><b>' + UI.esc(n) + '</b></button>').join("") +
         '</div>' +
-        '<button class="btn btn-block mt" data-skip>Nobody\'s sure — just mark them out</button></div>';
+        '<button class="btn btn-block mt" data-skip>' +
+          (mine ? "Rather not say" : "Nobody's sure — just mark them out") + '</button></div>';
       document.body.appendChild(wrap);
       const done = v => { wrap.remove(); resolve(v); };
       wrap.querySelector("[data-skip]").onclick = () => done(null);

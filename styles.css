@@ -1742,3 +1742,38 @@ small.ko { display: block; font-size: 10.5px; color: var(--ink-dim); font-weight
 }
 .rc-ko .ko-bad b { color: var(--out); }
 .rc-ko .ko-good b { color: var(--ok); }
+
+/* ------------------------------------------------------- SEASON EXTRAS --
+   The best hand anyone has hit, and who has done the most damage. */
+.ex-h {
+  font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--brass); margin-bottom: 8px;
+}
+.ex-hand { font-family: var(--display); font-size: 26px; color: var(--brass-hi); line-height: 1.1; }
+.ex-who { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.ex-who span {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 11px 7px 7px; border-radius: 999px;
+  background: #0e241980; border: 1px solid var(--line-soft);
+}
+.ex-who b { font-size: 14px; }
+.ex-who small { font-size: 11px; color: var(--ink-dim); }
+
+.ko-board { display: flex; flex-direction: column; gap: 6px; }
+.ko-line { display: flex; align-items: center; gap: 8px; }
+.ko-n { width: 16px; font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
+.ko-name { flex: 0 0 auto; min-width: 76px; font-size: 13.5px; font-weight: 600; }
+.ko-bar { flex: 1; height: 8px; border-radius: 999px; background: #0e2419; overflow: hidden; }
+.ko-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--brass-dim), var(--brass)); }
+.ko-line.lead .ko-bar i { background: linear-gradient(90deg, var(--brass), var(--brass-hi)); }
+.ko-k { font-family: var(--mono); font-size: 14px; color: var(--brass-hi); min-width: 20px; text-align: right; }
+
+/* Claiming the high hand from your own seat. */
+.ss-hh { margin-top: 12px; }
+.hh-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 11px; border-radius: var(--radius-s);
+  background: #0b1e1580; border: 1px solid var(--line-soft);
+}
+.hh-l { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; font-size: 13.5px; }
+.hh-l small { font-size: 11px; color: var(--ink-dim); }

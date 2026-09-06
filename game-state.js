@@ -97,6 +97,7 @@
     seats: null,
     money: null,          // admin overrides for kitty % and payout splits
     bounty: null,         // who took out the defending champion, once it happens
+    highHand: null,       // best hand of the night, claimed by whoever hit it
     results: {},          // finalized games, for the bounty and the streak
     timer: null,
     rsvp: {},
@@ -133,6 +134,7 @@
       DB.on("rsvp/" + GAME_ID, v => { S.rsvp    = v || {};        emit(); });
       DB.on("config/money",    v => { S.money   = v || null;      emit(); });
       DB.on(BASE + "/bounty",  v => { S.bounty  = v || null;      emit(); });
+      DB.on(BASE + "/highHand", v => { S.highHand = v || null;     emit(); });
       /* Finalized history — the bounty rides on the last game's winner, and
          who that is is a fact about games already played. */
       DB.on("results",         v => { S.results = v || {};        emit(); });
@@ -259,6 +261,32 @@
         return Promise.reject(new Error("Splits add up to " + total + "%, they must total 100%"));
       }
       return DB.save("payout splits", () => DB.set("config/money/splits", a));
+    },
+
+    /* --------------------------------------------------------- HIGH HAND
+
+       The best hand of the night. Anyone can claim it from their own seat;
+       the host can overwrite or clear it. Only a BETTER hand replaces one
+       that is already standing, so a later claim cannot quietly demote the
+       quads somebody hit at level 3.
+       ------------------------------------------------------------------- */
+    highHand() { return S.highHand || null; },
+
+    claimHighHand(name, cat, note, force) {
+      if (!name) return Promise.reject(new Error("Say who you are first"));
+      if (BPL.handRank(cat) === 99) return Promise.reject(new Error("Pick a hand"));
+      const cur = S.highHand;
+      if (!force && cur && BPL.handRank(cur.cat) <= BPL.handRank(cat)) {
+        return Promise.reject(new Error(
+          cur.name + "'s " + BPL.handLabel(cur.cat).toLowerCase() + " still beats that."));
+      }
+      const row = { name: name, cat: cat, at: DB.now() };
+      if (note) row.note = String(note).slice(0, 60);
+      return DB.save("high hand", () => DB.set(BASE + "/highHand", row));
+    },
+
+    clearHighHand() {
+      return DB.save("clear high hand", () => DB.set(BASE + "/highHand", null));
     },
 
     /* ------------------------------------------------------------ BOUNTY */
@@ -761,11 +789,26 @@
 
     /* -------------------------------------------- player: reports only  */
     /** The ONLY write a player device makes. Creates a pending note. */
-    report(name, type) {
+    /**
+     * A player's own report. `by` is who they say knocked them out.
+     *
+     * The player answers this, not the host: they know exactly who got them,
+     * they are out of the hand with nothing else to do, and the host is the
+     * one person at that table who is genuinely busy. Asking Nate twenty
+     * times a night was a tax on the wrong man.
+     */
+    report(name, type, by) {
       const dupe = Game.pendingReports().find(r => r.name === name && r.type === type);
       if (dupe) return Promise.resolve(dupe.id);
-      return DB.save("send report",
-        () => DB.push(BASE + "/reports", { name: name, type: type, at: DB.now() }));
+      const row = { name: name, type: type, at: DB.now() };
+      if (by && by !== name) row.by = by;
+      return DB.save("send report", () => DB.push(BASE + "/reports", row));
+    },
+
+    /** Who a pending report says did it, if the player said. */
+    reportedBy(name) {
+      const r = Game.pendingReports().find(x => x.name === name && x.type === "out");
+      return (r && r.by) || null;
     },
 
     dismissReport(id) {
@@ -793,7 +836,9 @@
      */
     confirmOut(name, reportId, killer) {
       if (Game.active().indexOf(name) === -1) return Promise.resolve(null);
-      const by = (killer && killer !== name && S.players[killer]) ? killer : null;
+      /* The player's own answer stands unless the host names someone else. */
+      const said = killer || Game.reportedBy(name);
+      const by = (said && said !== name && S.players[said]) ? said : null;
 
       const patch = {};
       patch[BASE + "/players/" + name + "/status"] = "out";
@@ -981,6 +1026,7 @@
         bountyOn: money.bountyOn || null,
         bountyStreak: money.bountyStreak || 0,
         bountyWonBy: bountyWinner || null,
+        highHand: S.highHand || null,
         winner: winner,
         finish: rows,
         finalizedAt: DB.now()

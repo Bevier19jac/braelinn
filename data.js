@@ -27,18 +27,25 @@ const LEAGUE = {
      Set active:false to hide one. First active item wins.
      type: "special" | "info" | "alert"
      ------------------------------------------------------------------------ */
+  /* --------------------------------------------------------------------------
+     LEAGUE NEWS — the banner on Tonight.
+
+     Every announcement carries `until`: the last day it should be seen. Once
+     that day has passed the app stops showing it, on its own. A banner still
+     advertising a night that already happened is the same stale-site problem
+     as a stale game date, and it went live once already ("Season 7 kicks off
+     Thursday, September 3" was still up on the 6th).
+
+     Leave `until` off only for something genuinely timeless.
+     ------------------------------------------------------------------------ */
   announcements: [
     {
       active: true,
       type: "special",
-      icon: "🏆",
-      text: "Season 7 kicks off Thursday, September 3 — cards roll at 8:30. RSVP below."
-    },
-    {
-      active: false,
-      type: "info",
-      icon: "📋",
-      text: "Standings updated after Event 1."
+      icon: "🎯",
+      until: "2027-05-31",
+      text: "$20 rides on the last winner's head — knock them out and it's yours. " +
+            "Back-to-back wins stack it."
     }
   ],
 
@@ -477,6 +484,61 @@ const BPL = {
     return { table: amounts };
   },
 
+  /* --------------------------------------------------------- HIGH HAND
+
+     Ranked by category, best first. A home game does not want to type in
+     five cards at 11pm, so the category is the ranking and the note is
+     whatever they actually said ("quad 8s", "aces full"). Two royal
+     flushes in a season are a genuine tie and are shown as one.
+     --------------------------------------------------------------------- */
+  HANDS: [
+    { key: "royal",    label: "Royal flush" },
+    { key: "sflush",   label: "Straight flush" },
+    { key: "quads",    label: "Four of a kind" },
+    { key: "boat",     label: "Full house" },
+    { key: "flush",    label: "Flush" },
+    { key: "straight", label: "Straight" },
+    { key: "trips",    label: "Three of a kind" },
+    { key: "twopair",  label: "Two pair" },
+    { key: "pair",     label: "One pair" }
+  ],
+
+  handRank(key) {
+    const i = BPL.HANDS.findIndex(h => h.key === key);
+    return i === -1 ? 99 : i;                 // lower is better
+  },
+
+  handLabel(key) {
+    const h = BPL.HANDS.find(x => x.key === key);
+    return h ? h.label : "";
+  },
+
+  /**
+   * The best hand of the season, and everyone tied for it.
+   * Returns null until somebody records one.
+   */
+  highHand(results) {
+    const all = [];
+    BPL.gamesByDate(results).forEach(g => {
+      const h = g.highHand;
+      if (h && h.name && h.cat) all.push(Object.assign({ date: g.date }, h));
+    });
+    if (!all.length) return null;
+    const best = Math.min.apply(null, all.map(h => BPL.handRank(h.cat)));
+    const top = all.filter(h => BPL.handRank(h.cat) === best)
+                   .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    return { cat: top[0].cat, label: BPL.handLabel(top[0].cat), holders: top };
+  },
+
+  /** Knockout leaderboard, most first. Only games that recorded them count. */
+  knockoutBoard(results) {
+    const k = BPL.knockouts(results);
+    return Object.keys(k)
+      .map(n => ({ name: n, kills: k[n].kills, deaths: k[n].deaths }))
+      .filter(r => r.kills > 0)
+      .sort((a, b) => b.kills - a.kills || a.name.localeCompare(b.name));
+  },
+
   /* ---------------------------------------------------------- KNOCKOUTS
 
      Who has busted whom, across every finalized game. Only rows that
@@ -742,8 +804,19 @@ const BPL = {
     });
   },
 
+  /**
+   * The banner to show, if any. An announcement past its `until` date is
+   * gone whether or not anybody remembered to switch it off.
+   */
   activeAnnouncement() {
-    return LEAGUE.announcements.find(a => a.active) || null;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return LEAGUE.announcements.find(a => {
+      if (!a || !a.active) return false;
+      if (!a.until) return true;
+      const [y, m, d] = String(a.until).split("-").map(Number);
+      return new Date(y, m - 1, d) >= today;
+    }) || null;
   },
 
   /**

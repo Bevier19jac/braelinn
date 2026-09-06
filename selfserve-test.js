@@ -51,7 +51,11 @@ const openMine = async p => { await p.locator('.bseat.mine').click(); await p.wa
 
  console.log('\n== THEY SAY THEY ARE OUT ==');
  await p.click('#ssBust [data-imout]'); await p.waitForTimeout(300);
- await p.locator('.sheet [data-yes]').click(); await p.waitForTimeout(900);
+ await p.locator('.sheet [data-yes]').click(); await p.waitForTimeout(700);
+ /* And they're asked who got them -- their own answer, not the host's job. */
+ ok('asked_who_got_them', (await p.locator('.sheet h3').last().innerText()).includes('Who got you'));
+ await p.locator('.sheet .pickrow', {hasText:'Nate'}).last().click(); await p.waitForTimeout(900);
+ ok('their_answer_is_on_the_report', await p.evaluate(()=>Game.reportedBy('Syd'))==='Nate');
  const rep = await p.evaluate(()=>Game.pendingReports().map(r=>r.name+':'+r.type));
  say('reports', rep);
  ok('report_sent', rep.includes('Syd:out'));
@@ -70,6 +74,7 @@ const openMine = async p => { await p.locator('.bseat.mine').click(); await p.wa
  ok('queue_shows_the_report', q.includes('Syd'));
  await p.evaluate(()=>{const r=Game.pendingReports().find(x=>x.name==='Syd');return Game.confirmOut('Syd', r&&r.id);});
  await p.waitForTimeout(700);
+ ok('the_knockout_carried_through', await p.evaluate(()=>Game.outBy('Syd'))==='Nate');
  ok('now_out', await p.evaluate(()=>Game.active().indexOf('Syd')===-1));
  ok('place_recorded', typeof (await p.evaluate(()=>Game.placeOf('Syd')))==='number');
  ok('report_cleared', await p.evaluate(()=>Game.pendingReports().length)===0);

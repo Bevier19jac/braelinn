@@ -92,6 +92,24 @@ console.log('\n== THE DATE ROLL ACROSS REAL CLOCK EDGES ==');
   }
 }
 
+console.log('\n== THE NEWS BANNER EXPIRES ON ITS OWN ==');
+{
+  /* A banner still advertising a night that has already happened is the
+     stale-site problem in miniature, and it went live once. */
+  const {LEAGUE,BPL}=load();
+  const dated = LEAGUE.announcements.filter(a=>a.active && !a.until);
+  chk(dated.length===0, 'every live announcement has an expiry', dated.map(a=>a.text));
+  const a = BPL.activeAnnouncement();
+  chk(!!a, 'something is showing today');
+  const [y,m,d] = String(a.until).split('-').map(Number);
+  const after = load(new Date(y, m-1, d+1, 12, 0).getTime());
+  const stillUp = after.BPL.activeAnnouncement();
+  chk(!stillUp || stillUp.until !== a.until,
+      'it is gone the day after its expiry', stillUp && stillUp.text);
+  const onLastDay = load(new Date(y, m-1, d, 23, 0).getTime()).BPL.activeAnnouncement();
+  chk(!!onLastDay, 'but still up on the last day itself');
+}
+
 console.log('\n== PAYOUTS AT EVERY FIELD SIZE 2..40 ==');
 {
   const {BPL}=load();
