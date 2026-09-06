@@ -205,17 +205,34 @@
      * percentage splits, exactly as before. Returns { table } or { error }.
      */
     payouts(net, field) {
+      const size = Math.max(1, field || 1);
       const f = Game.firstPrize();
       const n = Game.placesPaid();
-      if (f && n) return BPL.payoutPlan(net, f, n, Game.splits(field || 1));
-      return { table: BPL.payoutTable(net, field || 1, Game.splits(field || 1)) };
+
+      /* NEVER pay more places than there are players.
+       *
+       * "Pay four" set when eighteen were expected, then six turn up, used to
+       * allocate money to 5th and 6th -- places nobody finished in. Those
+       * shares were simply never handed out: the record said $120 pot and the
+       * players took $90. Found by walking every field 2..8 against every
+       * plan; 4,875 combinations lost money.
+       *
+       * The plan is a standing instruction, so it is capped at payout time
+       * rather than rejected when it is set -- the field moves all night. */
+      const places = Math.min(n || size, size);
+      if (f) return BPL.payoutPlan(net, f, places, Game.splits(size));
+
+      const splits = Game.splits(size).slice(0, size);
+      return { table: BPL.payoutTable(net, size, splits) };
     },
 
     setKittyAmount(dollars) {
       if (dollars === null || dollars === "") {
         return DB.save("kitty back to a percentage", () => DB.set("config/money/kittyAmount", null));
       }
-      const n = Math.round(Number(dollars));
+      /* Snapped to a $10 note like every other number on the night —
+         the kitty comes out of the same stack of twenties the pot does. */
+      const n = BPL.round10(Number(dollars));
       if (!isFinite(n) || n < 0 || n > 5000) {
         return Promise.reject(new Error("Kitty must be a dollar amount up to $5,000"));
       }
@@ -228,14 +245,24 @@
         return DB.save("back to percentage payouts",
           () => DB.multi({ "config/money/firstPrize": null, "config/money/places": null }));
       }
-      const f = Math.round(Number(first));
+      const f = BPL.round10(Number(first));   // every prize is a $10 note
       const n = Math.round(Number(places));
       if (!isFinite(f) || f <= 0) return Promise.reject(new Error("First place needs a dollar amount"));
       if (f > 10000) return Promise.reject(new Error("That's more than any night's pot"));
       if (!isFinite(n) || n < 1 || n > 12) return Promise.reject(new Error("Pay between 1 and 12 places"));
-      /* Refuse to store a plan that cannot make an honest table tonight. */
-      const test = BPL.payoutPlan(Game.pot().net, f, n, Game.splits(Game.fieldSize() || 1));
-      if (test.error) return Promise.reject(new Error(test.error));
+
+      /* Stored even when it does not work YET.
+       *
+       * This used to validate against the pot at the moment it was set, and
+       * refused "$150 to first, pay three" at 8:30 because the eight buy-ins
+       * on the table were only $240 with a $120 kitty. An hour of rebuys
+       * later it was perfectly fine. A plan is a standing instruction for a
+       * pot that grows all night; rejecting it up front is being right at
+       * the wrong moment.
+       *
+       * The panel says live whether it currently works, the action queue
+       * chases it while it doesn't, and finalize refuses rather than
+       * inventing money. That is three warnings before it can hurt. */
       return DB.save("payouts: " + BPL.money(f) + " to 1st, " + n + " paid",
         () => DB.multi({ "config/money/firstPrize": f, "config/money/places": n }));
     },
@@ -861,12 +888,25 @@
       return (p && p.outBy) || null;
     },
 
-    /** Put someone back in — undoes a mistaken elimination. */
+    /**
+     * Put someone back in — undoes a mistaken elimination.
+     *
+     * If seats have been drawn and they are no longer in the order (they were
+     * busted before a consolidation, so the redraw left them out), append them
+     * the same way a latecomer is seated. Otherwise they'd be alive with
+     * nowhere to sit and the felt would simply not show them.
+     */
     reinstate(name) {
       const patch = {};
       patch[BASE + "/players/" + name + "/status"] = "active";
       patch[BASE + "/players/" + name + "/bustAt"] = null;
       patch[BASE + "/players/" + name + "/outBy"] = null;   // they're not out any more
+
+      const s = S.seats;
+      if (s && Array.isArray(s.order) && s.order.indexOf(name) === -1) {
+        patch[BASE + "/seats/order"] = s.order.concat([name]);
+      }
+
       return DB.save("reinstate " + name, () => DB.multi(patch));
     },
 

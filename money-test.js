@@ -69,13 +69,14 @@ console.log('\n== A GAME ALREADY IN THE BOOKS RESCORES UNDER TODAY\'S RULES ==')
   /* A record written BEFORE the in-the-money bonus existed: old point totals
      baked in, no bounty field. The standings must not keep scoring that night
      under the retired formula. */
+  /* A full record, the shape finalize actually writes: field size and row
+     count agree, places run 1..field. Anything looser is not a game the app
+     produced, and is ignored on purpose. */
+  const names = ['Nate','Syd','Tod','Guy','Tim','Drew','Steele','Philo','Erik V','Jacob'];
   const old = {gameId:'2026-09-03',date:'2026-09-03',season:7,label:'Event 1',type:'regular',
     field:10,winner:'Nate',finalizedAt:1,pot:300,gross:300,kitty:0,
-    finish:[{place:1,name:'Nate',points:3000,winnings:150,rebuys:0,itm:true},
-            {place:2,name:'Syd',points:2700,winnings:90,rebuys:0,itm:true},
-            {place:3,name:'Tod',points:2400,winnings:60,rebuys:0,itm:true},
-            {place:4,name:'Guy',points:2100,winnings:0,rebuys:0,itm:false},
-            {place:10,name:'Jacob',points:300,winnings:0,rebuys:0,itm:false}]};
+    finish: names.map((n,i)=>({place:i+1, name:n, points:(10-i)*300,
+      winnings:[150,90,60][i]||0, rebuys:0, itm:i<3}))};
   const a = BPL.aggregate({'2026-09-03': old});
   const pts = n => (a.players.find(p=>p.name===n)||{}).points;
   ok('the winner picks up the bonus', pts('Nate')===3100, pts('Nate'));
@@ -90,17 +91,20 @@ console.log('\n== A GAME ALREADY IN THE BOOKS RESCORES UNDER TODAY\'S RULES ==')
   const bp = n => (b.players.find(p=>p.name===n)||{}).points;
   ok('winnings stand in for a missing itm flag', bp('Nate')===3100 && bp('Guy')===2100, [bp('Nate'),bp('Guy')]);
 
-  /* A record too odd to recompute keeps whatever it stored, rather than 0. */
+  /* A record with no field size was not written by this app. It is ignored
+     entirely rather than half-counted -- the same rule the standings, the
+     bounty and the news banner all now share. */
   const odd = {gameId:'x',date:'2026-01-01',season:7,label:'x',type:'regular',
     winner:'Nate',finalizedAt:1,
     finish:[{place:1,name:'Nate',points:999},{place:2,name:'Syd',points:111}]};
-  const cp = BPL.aggregate({x: odd}).players.find(p=>p.name==='Nate');
-  ok('a record with no field size keeps its stored points', cp.points===999, cp.points);
+  ok('a record with no field size is not a game', BPL.isRealGame(odd)===false);
+  ok('and moves nobody', BPL.aggregate({x: odd}).players.every(p=>p.events===0));
 }
 
 console.log('\n== THE BOUNTY STACKS WITH CONSECUTIVE WINS ==');
 {
-  const g = (date,winner)=>({date,winner,field:10,finish:[{place:1,name:winner,points:3000}]});
+  const g = (date,winner)=>({gameId:date, date, winner, finalizedAt:1, field:2,
+    finish:[{place:1,name:winner,points:3000},{place:2,name:'Somebody Else',points:300}]});
   const R = arr => { const o={}; arr.forEach(x=>o[x.date]=x); return o; };
   ok('no bounty before the first game', BPL.bountyOn({})===null);
   let b = BPL.bountyOn(R([g('2026-09-03','Nate')]));

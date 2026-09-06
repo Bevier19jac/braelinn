@@ -1777,3 +1777,12 @@ small.ko { display: block; font-size: 10.5px; color: var(--ink-dim); font-weight
 }
 .hh-l { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; font-size: 13.5px; }
 .hh-l small { font-size: 11px; color: var(--ink-dim); }
+
+/* Which side of the break we're on. Nate sets the payouts once rebuys shut
+   and the pot can no longer move; a number set before that is a guess. */
+.potstate {
+  margin: 0 0 10px; padding: 7px 10px; border-radius: var(--radius-s);
+  font-size: 12px; border: 1px solid var(--line-soft);
+}
+.potstate.open  { color: var(--maybe); border-color: var(--brass-dim); background: #1a140880; }
+.potstate.final { color: var(--ok); background: #0e241980; }

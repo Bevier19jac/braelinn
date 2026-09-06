@@ -40,11 +40,12 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
     what the app derives from them. The last night is played for real. */
  const fakeGame = (date, winner) => p.evaluate(async ([date, winner]) => {
    await DB.set('results/'+date, {
-     gameId:date, date:date, season:7, label:'Sim', type:'regular', field:10,
+     gameId:date, date:date, season:7, label:'Sim', type:'regular', field:2,
      buyinAmount:30, rebuyAmount:30, rebuys:0, gross:300, kittyPct:0, kitty:0,
      pot:300, bounty:0, bountyOn:null, bountyStreak:0, bountyWonBy:null,
      winner:winner, finalizedAt:Date.now(),
-     finish:[{place:1,name:winner,points:3000,rebuys:0,late:false,winnings:300,bounty:0,itm:true}]
+     finish:[{place:1,name:winner,points:3000,rebuys:0,late:false,winnings:300,bounty:0,itm:true},
+             {place:2,name:'Runner Up',points:300,rebuys:0,late:false,winnings:0,bounty:0,itm:false}]
    });
  }, [date, winner]);
 
@@ -139,10 +140,11 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
    const out = await q.evaluate(async(F)=>{
      await DB.set('results', null);
      const d='2026-07-01';
-     await DB.set('results/'+d, {gameId:d,date:d,season:7,label:'Prior',type:'regular',field:10,
+     await DB.set('results/'+d, {gameId:d,date:d,season:7,label:'Prior',type:'regular',field:2,
        buyinAmount:30,rebuyAmount:30,rebuys:0,gross:300,kittyPct:0,kitty:0,pot:300,
        bounty:0,bountyOn:null,bountyStreak:0,bountyWonBy:null,winner:'Tod',finalizedAt:Date.now(),
-       finish:[{place:1,name:'Tod',points:3000,rebuys:0,late:false,winnings:300,bounty:0,itm:true}]});
+       finish:[{place:1,name:'Tod',points:3000,rebuys:0,late:false,winnings:300,bounty:0,itm:true},
+             {place:2,name:'Runner Up',points:300,rebuys:0,late:false,winnings:0,bounty:0,itm:false}]});
      await new Promise(r=>setTimeout(r,500));
      await Game.resetNight(); await Game.start();
      for (const n of F) await Game.checkIn(n,{});

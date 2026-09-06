@@ -113,7 +113,8 @@ console.log('\n== THE NEWS BANNER EXPIRES ON ITS OWN ==');
 console.log('\n== THE NEWS NAMES WHOEVER IS CARRYING THE MONEY ==');
 {
   const {BPL}=load();
-  const g=(d,w)=>({date:d,winner:w,field:12,finish:[{place:1,name:w,points:3700}]});
+  const g=(d,w)=>({gameId:d, date:d, winner:w, finalizedAt:1, field:2,
+    finish:[{place:1,name:w,points:3700},{place:2,name:'Runner Up',points:300}]});
   const R=a=>{const o={};a.forEach(x=>o[x.date]=x);return o;};
 
   chk(BPL.newsLine({})===null, 'nothing derivable before the first game');

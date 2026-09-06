@@ -99,17 +99,41 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
  say('what the panel says', (await p.locator('#planNote').innerText()));
  say('payout list', (await p.locator('#payoutList').innerText()).replace(/\n+/g,' | '));
 
- console.log('\n== IT REFUSES A TABLE THAT CANNOT ADD UP ==');
- const bad = await p.evaluate(()=>Game.setPrizePlan(20, 6).then(()=>'allowed').catch(e=>e.message));
- ok('too_little_to_first_refused', bad!=='allowed', bad);
+ console.log('\n== A FIRST PRIZE TOO SMALL IS LIFTED, AND SAID OUT LOUD ==');
+ /* His number is a floor, not a ceiling: the table is repaired rather than
+    refused, so a night can never be blocked by it -- but the panel says
+    plainly that his number moved. */
+ await p.evaluate(()=>Game.setPrizePlan(20, 6)); await p.waitForTimeout(700);
+ const lifted = await p.evaluate(()=>Game.payouts(Game.pot().net, Game.fieldSize()));
+ say('asked for $20 to 1st', lifted.table || lifted.error);
+ ok('it_still_pays', Array.isArray(lifted.table), lifted);
+ ok('1st_was_lifted', lifted.lifted > 0 && lifted.asked === 20, lifted);
+ const note = await p.locator('#planNote').innerText();
+ say('the panel says', note);
+ ok('and_the_panel_says_his_number_moved', note.indexOf('lifted from') !== -1 && note.indexOf('keep 2nd behind') !== -1, note);
+ ok('the_queue_is_quiet_because_it_pays', !(await p.locator('#queue').innerText()).includes("don't add up"));
+
+ console.log('\n== A POT THAT GENUINELY CANNOT PAY IS STILL REFUSED ==');
+ await p.evaluate(()=>Game.setKittyAmount(540)); await p.waitForTimeout(500);
+ const impossible = await p.evaluate(()=>({pot:Game.pot().net, plan:Game.payouts(Game.pot().net, Game.fieldSize())}));
+ say('tiny pot, six places', impossible);
+ ok('refused_when_it_truly_cannot', !!impossible.plan.error, impossible.plan);
+ ok('and_the_queue_chases_that', (await p.locator('#queue').innerText()).includes("don't add up"));
+ const blocked = await p.evaluate(()=>Game.finalize().then(()=>'allowed').catch(e=>e.message));
+ ok('and_finalize_refuses', blocked!=='allowed', blocked);
+ await p.evaluate(()=>Game.setKittyAmount(120)); await p.waitForTimeout(500);
  const huge = await p.evaluate(()=>Game.setPrizePlan(99999, 4).then(()=>'allowed').catch(e=>e.message));
- ok('more_than_the_pot_refused', huge!=='allowed', huge);
+ ok('an_absurd_first_prize_is_refused_outright', huge!=='allowed', huge);
+
+ console.log('\n== PUT IT BACK AND THE NIGHT PROCEEDS ==');
+ await p.fill('#cfgFirst','200'); await p.fill('#cfgPlaces','4');
+ await p.click('#btnPlan'); await p.waitForTimeout(1000);
  const still = await p.evaluate(()=>Game.payouts(Game.pot().net, Game.fieldSize()).table);
- ok('the_good_plan_survived', still[0]===200 && still.length===4, still);
+ ok('the_good_plan_is_back', still && still[0]===200 && still.length===4, still);
 
  console.log('\n== AND THE NIGHT FINALIZES ON THOSE NUMBERS ==');
  const rec = await p.evaluate(async()=>{
-   await Game.drawSeats(2); await Game.setStatus('running'); await Game.timerStart();
+   if (!Game.state().seats) { await Game.drawSeats(2); await Game.setStatus('running'); await Game.timerStart(); }
    const a = Game.active(); for (let i=0;i<a.length-1;i++) await Game.confirmOut(a[a.length-1-i]);
    return Game.finalize();
  });

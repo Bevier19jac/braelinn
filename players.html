@@ -96,14 +96,14 @@
     if (agg) agg.players.forEach(p => { byName[p.name] = p; });
     const ko = BPL.knockouts(rawResults);
 
-    const list = LEAGUE.standings.slice()
+    const list = BPL.people(rawResults).slice()
       .sort((a, b) => a.name.localeCompare(b.name))
       .filter(p => !q ||
         p.name.toLowerCase().indexOf(q) !== -1 ||
         (p.fullName || "").toLowerCase().indexOf(q) !== -1);
 
     document.getElementById("sub").textContent =
-      LEAGUE.standings.length + " on the roster";
+      BPL.people(rawResults).length + " on the roster";
 
     document.getElementById("roster").innerHTML = list.map(p => {
       const s = byName[p.name] || { events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0 };

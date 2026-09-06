@@ -84,7 +84,8 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
  ok('quads_still_stands', season.hh.cat==='quads' && season.hh.holders[0].name==='Tod', season.hh);
  ok('a_later_flush_does_not_beat_it', season.hh.holders.length===1);
  say('knockout board', season.board.slice(0,4));
- ok('board_is_ranked', season.board[0].kills >= season.board[1].kills);
+ ok('a board exists at all', season.board.length>0, season.board);
+ ok('board_is_ranked', season.board.every((r,i)=>i===0||r.kills<=season.board[i-1].kills), season.board);
  /* Night 1 credited every bust to Nate, night 2 gave Syd three -- so Nate
     leads on the combined board. Checked as arithmetic, not as a guess. */
  const expect = {}; 

@@ -113,6 +113,66 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 6 Sep — a smoke-test campaign, and the eight bugs it found
+
+Ran an adversarial sweep before Event 2: five new hunt suites, a full parameter
+sweep over the payout maths, and thirty complete rehearsed game nights. Eight
+real bugs, every one of which would have bitten on a game night.
+
+**The money.**
+
+- `places > field` handed out money to people who weren't there. 4,875 bad
+  combinations. Places are now capped at the field size.
+- A pot of $0 or less produced a $0 "cash" that scored the 100-point
+  in-the-money bonus. `payoutTable` returns an empty table instead.
+- A late override top-up after the payouts were set made the night
+  **unfinalizable**: at the break $390 paid 160/140/90; one override rebuy
+  later the pot was $420 and 2nd computed to $160 as well. The number Nate
+  says is now a **floor**, not a ceiling — surplus goes to the winner, which
+  is where the room would put it anyway, and the panel says so out loud.
+- The advice was wrong 26,067 times. The first version solved the 1st-vs-2nd
+  constraint algebraically; it now searches in $10 steps and only ever
+  suggests a number it has **proved** builds a real table.
+- The advice **gave up when it shouldn't have**: "A $60 pot can't pay 3
+  places" — except $60 pays 30/20/10 perfectly well. The builder only ever
+  lifts 1st, so a number that was too *high* walked away from the answer.
+  3,892 pots were declared unpayable that pay fine from a lower first.
+  The search is now the authority; `_buildPlan` only describes what is wrong
+  with the number given.
+- The advice **named the wrong number** — "try $10 to 1st" when the winner
+  would actually be handed $30, because the builder lifts. It now names what
+  1st is handed.
+- The kitty and first place are snapped to a $10 note like every other number,
+  and the toast says back what was **stored**, not what was typed. A toast
+  reading "$126 to 1st" over a table that pays $130 is the app lying about
+  itself.
+
+**The felt.**
+
+- A player busted before a table break and then reinstated was alive with
+  **nowhere to sit** — the felt simply would not show him. Reinstating now
+  puts him back in the seating order, the same way a latecomer is seated.
+
+**The roster.**
+
+- A walk-in typed in at the door scored like anyone else and appeared in the
+  standings — and the week after, he could not sign in, could not RSVP, had no
+  player card, and Nate had to retype his name. He was a real player
+  everywhere except the two places he needed to be. The sign-in gate, the RSVP
+  board, the roster page and the add-player picker now all read `BPL.people()`,
+  one shared answer to "who is a person here".
+
+*Same lesson as every other week: a fact kept in two places drifts.* This time
+it was the roster (data.js vs. the standings), the first-prize number (the
+input box vs. the toast), and "can this pot pay?" (the builder vs. the truth).
+
+**Verification.** 25 suites green. 160,792 payout combinations produce a table
+that sums to the pot, lands on $10 notes, and never has 2nd catching 1st — with
+zero bad suggestions and zero pots wrongly given up on. Thirty complete
+rehearsed nights: 38 consolidations, 90 top-ups, 30 post-break top-ups blocked,
+10 walk-ins, 20 bounties, 45 self check-ins, 379 knockouts, no page errors,
+every invariant held.
+
 ### 6 Sep — the knockout question moved to the player, plus season extras
 
 **Jacob: "is it going to be confusing for Nate to enter who knocked out who?"**

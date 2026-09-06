@@ -38,9 +38,10 @@ const note = (night, what, detail) => {
  const B='http://localhost:8973/';
 
  console.log('Rehearsing ' + NIGHTS + ' complete game nights.\n');
- let knockouts = 0, consolidations = 0, rebuysTaken = 0, rebuysRefused = 0, walkIns = 0, bounties = 0, selfCheckIns = 0;
+ let adviceTaken = 0, plansSet = 0, knockouts = 0, consolidations = 0, rebuysTaken = 0, rebuysRefused = 0, walkIns = 0, bounties = 0, selfCheckIns = 0;
 
  for (let night = 1; night <= NIGHTS; night++) {
+   let atBreak = null;
    const field = 8 + Math.floor(Math.random()*20);          // 8..27 turn up
    const rsvpN = field + Math.floor(Math.random()*4);        // a few no-shows
 
@@ -87,6 +88,14 @@ const note = (night, what, detail) => {
    if (!(await p.evaluate(()=>Admin.isUnlocked()))) note(night,'passcode did not unlock Master Control');
 
    await p.goto(B+'game.html',{waitUntil:'networkidle'}); await p.waitForTimeout(600);
+   /* Half the nights run on a dollar plan Nate typed in, the other half on
+      the percentage table -- both must survive a field that moves. */
+   /* The payouts are NOT set here. Nate decides them at the first break,
+      once rebuys are shut and the pot has stopped moving -- so the plan goes
+      in after the clock passes the break, further down. */
+   await p.evaluate(()=>Promise.all([Game.setKittyAmount(null), Game.setPrizePlan(null, null)]));
+   await p.waitForTimeout(250);
+
    /* Seed the history the bounty rides on. Every night the app writes to the
       SAME game id, so without a dated predecessor there is never a defending
       champion -- and the whole bounty path would go untested. Two nights in
@@ -101,11 +110,12 @@ const note = (night, what, detail) => {
      for (let i = 0; i < streak; i++) {
        const d = '2026-0' + (i + 1) + '-01';
        await DB.set('results/' + d, {
-         gameId:d, date:d, season:7, label:'Prior', type:'regular', field:10,
+         gameId:d, date:d, season:7, label:'Prior', type:'regular', field:2,
          buyinAmount:30, rebuyAmount:30, rebuys:0, gross:300, kittyPct:0, kitty:0,
          pot:300, bounty:0, bountyOn:null, bountyStreak:0, bountyWonBy:null,
          winner:champ, finalizedAt:Date.now(),
-         finish:[{place:1,name:champ,points:3000,rebuys:0,late:false,winnings:300,bounty:0,itm:true}]
+         finish:[{place:1,name:champ,points:3000,rebuys:0,late:false,winnings:300,bounty:0,itm:true},
+                 {place:2,name:'Runner Up',points:300,rebuys:0,late:false,winnings:0,bounty:0,itm:false}]
        });
      }
    }, [champ, streak]);
@@ -190,6 +200,38 @@ const note = (night, what, detail) => {
    if (await p.evaluate(()=>Game.rebuyWindowOpen())) note(night,'rebuys stayed open past the break');
    const late = await p.evaluate(()=>{const a=Game.active();return Game.addRebuy(a[a.length-1]).then(()=>'allowed').catch(e=>e.message);});
    if (late === 'allowed') note(night,'a top-up went through after the break'); else rebuysRefused++;
+
+   /* THE BREAK: rebuys are shut, the pot is final, and this is the moment
+      Nate actually names the money. Half the nights in dollars, half left on
+      the percentage table. */
+   if (night % 2 === 1) {
+     const set = await p.evaluate(async()=>{
+       const kitty = Game.pot().gross > 600 ? 120 : 60;
+       await Game.setKittyAmount(kitty);
+       const net = Game.pot().net;
+       const places = Game.fieldSize() > 14 ? 4 : 3;
+       const first = BPL.round10(net * 0.42);
+       await Game.setPrizePlan(first, places);
+       let plan = Game.payouts(Game.pot().net, Game.fieldSize());
+       let took = null;
+
+       /* If his number doesn't work the app names one that does. Do what he
+          would do -- take it -- which also proves the advice is real. */
+       if (plan.error) {
+         const m = String(plan.error).match(/Try \$([\d,]+) to 1st/);
+         if (!m) return { first: first, places: places, result: plan.error, advice: 'none offered' };
+         took = Number(m[1].replace(/,/g, ''));
+         await Game.setPrizePlan(took, places);
+         plan = Game.payouts(Game.pot().net, Game.fieldSize());
+       }
+       return { first: first, places: places, took: took, result: plan.error || plan.table,
+                pot: Game.pot(), field: Game.fieldSize() };
+     });
+     if (!Array.isArray(set.result)) note(night,'the payouts could not pay, even after taking the advice', set);
+     if (set.took) adviceTaken++;
+     atBreak = set;
+     plansSet++;
+   }
    /* ...but the host can still push one through on purpose. */
    const forced = await p.evaluate(()=>{const a=Game.active();return Game.addRebuy(a[a.length-1],true).then(()=>'ok').catch(e=>e.message);});
    if (forced !== 'ok') note(night,'the host could not override the closed window',forced);
@@ -228,6 +270,7 @@ const note = (night, what, detail) => {
    }
 
    /* ------------------------------------ 6b. the bounty, if one is riding */
+   /* carried for diagnostics */
    var bt = await p.evaluate(()=>{const t=Game.bountyTarget();return t?{name:t.name,amount:t.amount,streak:t.streak}:null;});
    if (bt && bt.amount) {
      const playing = await p.evaluate(n=>Game.entrants().indexOf(n)!==-1, bt.name);
@@ -266,6 +309,16 @@ const note = (night, what, detail) => {
    const before = await snapshot();
    await p.click('.tabs button[data-tab="host"]').catch(()=>{});
    await p.waitForTimeout(200);
+   /* If the plan can't pay, say so plainly rather than letting the finalize
+      click fail silently -- that is how a broken night hides. */
+   const payCheck = await p.evaluate(()=>({
+     plan: Game.payouts(Game.pot().net, Game.fieldSize()),
+     pot: Game.pot(), first: Game.firstPrize(), places: Game.placesPaid(),
+     field: Game.fieldSize(), alive: Game.active().length
+   }));
+   if (payCheck.plan.error) note(night,'the payout plan could not pay',
+     { err: payCheck.plan.error, atFinalize: payCheck, atBreak: atBreak });
+
    await p.click('#btnFinalize'); await p.waitForTimeout(400);
    await p.locator('.sheet [data-yes]').click(); await p.waitForTimeout(1200);
 
@@ -302,6 +355,9 @@ const note = (night, what, detail) => {
 
    /* Money: every payout on a $10 note, the whole pot handed out, the kitty
       and the bounty accounted for, and cashing worth its bonus. */
+   const paidPlaces = rows.filter(r => r.winnings > 0).length;
+   if (paidPlaces > game.field) note(night,'paid more places than there were players',[paidPlaces, game.field]);
+   if (game.pot > 0 && !paidPlaces) note(night,'a pot with nobody paid from it', game.pot);
    const stray = rows.filter(r => r.winnings && !r.bounty && r.winnings % 10);
    if (stray.length) note(night,'a payout was not a multiple of $10', stray.map(r=>r.name+':'+r.winnings));
    if (game.kitty % 10) note(night,'kitty is not a multiple of $10', game.kitty);
@@ -340,6 +396,8 @@ const note = (night, what, detail) => {
  console.log('  bounties collected       : ' + bounties);
  console.log('  self check-ins           : ' + selfCheckIns);
  console.log('  knockouts recorded       : ' + knockouts);
+ console.log('  dollar payout plans      : ' + plansSet);
+ console.log('   of those, took the hint : ' + adviceTaken);
  console.log('  page errors              : ' + (errs.length ? JSON.stringify(errs.slice(0,3)) : 'none'));
  if (errs.length) problems.push('page errors: '+errs[0]);
 

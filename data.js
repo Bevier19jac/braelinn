@@ -391,11 +391,44 @@ const BPL = {
      played, and a fact kept in two places drifts.
      --------------------------------------------------------------------- */
 
-  /** Finalized games, oldest first. */
+  /** A finish list, however Firebase happened to store it. */
+  rowsOf(g) {
+    if (!g) return null;
+    if (Array.isArray(g.finish)) return g.finish;
+    if (g.finish && typeof g.finish === "object") return Object.keys(g.finish).map(k => g.finish[k]);
+    return null;
+  },
+
+  /**
+   * Does this record actually look like a finalized tournament?
+   *
+   * THE definition, used by everything that reads /results. It used to live
+   * inside aggregate() only, which meant the standings ignored junk but the
+   * front-page banner did not -- a stray write with a `winner` on it put
+   * "Ghost" on everybody's home screen carrying a $40 bounty. Anything that
+   * reads history has to agree on what history is.
+   */
+  isRealGame(g) {
+    if (!g || typeof g !== "object") return false;
+    if (typeof g.gameId !== "string" || typeof g.date !== "string") return false;
+    if (typeof g.finalizedAt !== "number") return false;
+    if (typeof g.winner !== "string" || !g.winner) return false;
+    /* finalize() refuses to write unless the places are exactly 1..field, so
+       a record whose row count doesn't match its own field size was not
+       written by this app. Checking the invariant the writer guarantees is
+       stricter than checking the shape, and it costs nothing. */
+    if (typeof g.field !== "number" || g.field < 2) return false;
+    const rows = BPL.rowsOf(g);
+    if (!rows || rows.length !== g.field) return false;
+    return rows.every(r => r && typeof r.name === "string" && r.name &&
+                           typeof r.place === "number" && r.place >= 1);
+  },
+
+  /** Finalized games, oldest first. Junk never gets in. */
   gamesByDate(results) {
     return Object.keys(results || {})
       .map(k => results[k])
-      .filter(g => g && g.date && g.winner && g.finish)
+      .filter(BPL.isRealGame)
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
   },
 
@@ -447,8 +480,49 @@ const BPL = {
   payoutPlan(net, first, places, splitsOverride) {
     const pot = Math.max(0, Math.round(Number(net) || 0));
     const n = Math.max(1, Math.round(Number(places) || 1));
-    const top = Math.round(Number(first) || 0);
+    /* Snap 1st to a $10 note too, so no line of the table ever needs a $5
+       bill. Everything below it is already rounded; leaving the top raw is
+       how you end up handing 2nd $104. */
+    const top = BPL.round10(Number(first) || 0);
 
+    const built = BPL._buildPlan(pot, top, n, splitsOverride);
+    if (built.table) return built;
+
+    /* Say what WOULD work, not just what is wrong.
+     *
+     * The first version of this solved only the 1st-vs-2nd constraint
+     * algebraically and was wrong more often than right -- a sweep of every
+     * pot and place count found 26,067 suggestions that still didn't pay.
+     * Bad advice at 1am is worse than none, so this searches for a first
+     * prize that actually builds a valid table, in $10 steps, and only
+     * suggests a number it has proved.
+     *
+     * The search is the authority on whether a night is payable, not
+     * _buildPlan. _buildPlan only ever lifts 1st, so a number that is too
+     * HIGH walks away from the answer and it reports "can't pay" for a pot
+     * that pays perfectly well from a lower first -- a sweep found 3,892 of
+     * those, $60 to 3 places (30/20/10) among them. Only when nothing in
+     * the whole range works is the refusal real. Note the range includes
+     * the pot itself, which is the only legal answer when one place pays. */
+    let best = null;
+    for (let f = 10; f <= pot; f += 10) {
+      const t = BPL._buildPlan(pot, f, n, splitsOverride);
+      if (!t.table) continue;
+      /* Suggest what 1st would ACTUALLY take, not the number probed -- the
+         builder lifts, so probing $10 on a $60 pot pays $30, and telling him
+         "try $10" when the winner gets $30 is advice that reads like a bug. */
+      const real = t.table[0];
+      if (!best || Math.abs(real - top) < Math.abs(best - top)) best = real;
+    }
+    if (best !== null) {
+      return { error: built.error + " Try " + BPL.money(best) + " to 1st." };
+    }
+    return { error: "A " + BPL.money(pot) + " pot can't pay " + n +
+                    (n === 1 ? " place." : " places.") };
+  },
+
+  /** The arithmetic, with no advice attached. Never call itself. */
+  _buildPlan(pot, top, n, splitsOverride) {
     if (top <= 0) return { error: "First place needs a dollar amount." };
     if (top > pot) return { error: "First place is more than the " + BPL.money(pot) + " pot." };
     if (n === 1) {
@@ -464,25 +538,42 @@ const BPL = {
        2nd through last still slope the way they always have. */
     const curve = (Array.isArray(splitsOverride) && splitsOverride.length >= n)
       ? splitsOverride.slice(0, n)
-      : BPL.splitsFor(n * 3);              // a tier deep enough to have n places
+      : BPL.splitsFor(n * 3);
     const tail = (curve.length >= n ? curve : BPL.splitsFor(999)).slice(1, n);
     while (tail.length < n - 1) tail.push(tail[tail.length - 1] || 1);
     const tailSum = tail.reduce((a, b) => a + b, 0) || 1;
 
-    const amounts = [top].concat(tail.map(w => BPL.round10(rest * w / tailSum)));
-    const drift = pot - amounts.reduce((a, b) => a + b, 0);
-    amounts[1] += drift;
+    /* Build the table, then LIFT 1st if the pot has outgrown the number the
+       host named.
+       
+       He sets the payouts at the break, when rebuys are shut and the pot has
+       stopped moving. But he can still push one through by override -- a man
+       handing over cash as the break is called is a real thing -- and that
+       grows the pot after the numbers are set. Found by rehearsal: at the
+       break, $390 and "first gets $160" paid 160/140/90; one override rebuy
+       later the pot was $420, 2nd computed to $160 as well, and the night
+       could not be finalized at all.
+       
+       His number is a FLOOR, not a ceiling. Surplus goes to the winner,
+       which is where a room would put it anyway, and the panel says so. */
+    let top2 = top;
+    let amounts, lifted = 0;
+    for (let guard = 0; guard < 200; guard++) {
+      const left = pot - top2;
+      if (left <= 0) break;
+      amounts = [top2].concat(tail.map(w => BPL.round10(left * w / tailSum)));
+      amounts[1] += pot - amounts.reduce((a, b) => a + b, 0);
+      let bad = amounts.some(a => a <= 0);
+      for (let i = 1; !bad && i < amounts.length; i++) if (amounts[i] >= amounts[i - 1]) bad = true;
+      if (!bad) return lifted ? { table: amounts, lifted: lifted, asked: top } : { table: amounts };
+      top2 += 10; lifted += 10;
+    }
 
-    if (amounts.some(a => a <= 0)) {
-      return { error: "That leaves a place on $0 — pay fewer places, or less to 1st." };
-    }
-    for (let i = 1; i < amounts.length; i++) {
-      if (amounts[i] >= amounts[i - 1]) {
-        return { error: BPL.ordinalOf(i + 1) + " would get as much as " + BPL.ordinalOf(i) +
-                        ". Give 1st more, or pay fewer places." };
-      }
-    }
-    return { table: amounts };
+    /* Lifting 1st ran out of room. That does NOT mean the pot cannot pay --
+       a first prize BELOW the one asked for often can, and payoutPlan goes
+       looking. This only describes what is wrong with the number given. */
+    return { error: BPL.money(top) + " to 1st leaves too little for " +
+                    (n - 1) + " more place" + (n === 2 ? "" : "s") + "." };
   },
 
   /* --------------------------------------------------------- HIGH HAND
@@ -605,9 +696,19 @@ const BPL = {
    * and their share rolls up, so every paid place is genuinely paid.
    */
   payoutTable(net, field, splitsOverride) {
-    const splits = (Array.isArray(splitsOverride) && splitsOverride.length)
-      ? splitsOverride : BPL.splitsFor(field || 1);
-    const amounts = splits.map(p => BPL.round10(net * p / 100));
+    const size = Math.max(1, field || 1);
+    /* Nothing to pay out. Returning [0] listed 1st as "in the money" for
+       zero dollars -- and since cashing is worth 100 points, a $0 cash was
+       worth points. Happens for real when a fixed kitty is as big as the
+       whole take at a small table. */
+    if (!(Number(net) > 0)) return [];
+    /* A custom split list longer than the field would allocate money to
+       places nobody finished in, and it would never be handed out. */
+    const raw = (Array.isArray(splitsOverride) && splitsOverride.length)
+      ? splitsOverride : BPL.splitsFor(size);
+    const splits = raw.slice(0, size);
+    const share = splits.reduce((a, b) => a + b, 0) || 1;
+    const amounts = splits.map(p => BPL.round10(net * (p / share) * 100 / 100));
     while (amounts.length > 1 && amounts[amounts.length - 1] <= 0) amounts.pop();
     const drift = net - amounts.reduce((a, b) => a + b, 0);
     if (amounts.length) amounts[0] += drift;
@@ -679,6 +780,29 @@ const BPL = {
     return BPL.pointsFor(place, field, itm);
   },
 
+  /**
+   * Everyone the app should offer by name: the roster in this file, plus
+   * anyone who has actually played a night.
+   *
+   * A walk-in typed in at the door scored like anyone else and showed up in
+   * the standings -- but the sign-in gate and the RSVP list both read
+   * LEAGUE.standings directly, so the week after, he could not sign in and
+   * nobody could RSVP for him. He was a real player everywhere except the
+   * two places he needed to be. THE single answer to "who is a person
+   * here", so those lists cannot disagree with the standings again.
+   */
+  people(results) {
+    const seen = {};
+    const out = LEAGUE.standings.map(p => { seen[p.name] = true; return p; });
+    BPL.aggregate(results || {}).players.forEach(p => {
+      if (seen[p.name] || !p.events) return;
+      seen[p.name] = true;
+      out.push({ name: p.name, fullName: p.fullName || p.name,
+                 avatar: p.avatar || "", saying: "", reg: false, walkOn: true });
+    });
+    return out;
+  },
+
   aggregate(results) {
     const byName = {};
     LEAGUE.standings.forEach(p => {
@@ -689,24 +813,12 @@ const BPL = {
     });
 
     /* Firebase stores a finish list as an array when the keys happen to be
-       0..n-1 and as an object otherwise. Accept both, or a real game quietly
-       vanishes from the standings. */
-    const rowsOf = g => Array.isArray(g.finish) ? g.finish
-                      : (g.finish && typeof g.finish === "object" ? Object.keys(g.finish).map(k => g.finish[k]) : null);
-
-    /* Only records that actually look like a finalized tournament are allowed
-       to move the season table. Anything else in /results -- a stray write, a
-       half-finished record, a leftover test row -- is ignored rather than
-       silently corrupting everyone's points. */
-    const isRealGame = g => {
-      if (!g || typeof g !== "object") return false;
-      if (typeof g.gameId !== "string" || typeof g.date !== "string") return false;
-      if (typeof g.finalizedAt !== "number") return false;
-      const rows = rowsOf(g);
-      if (!rows || rows.length < 2) return false;
-      return rows.every(r => r && typeof r.name === "string" && r.name &&
-                             typeof r.place === "number" && r.place >= 1);
-    };
+       0..n-1 and as an object otherwise; BPL.rowsOf accepts both, or a real
+       game quietly vanishes from the standings. And BPL.isRealGame is THE
+       test for whether a record may move the season table -- shared with
+       everything else that reads history, so they cannot disagree. */
+    const rowsOf = BPL.rowsOf;
+    const isRealGame = BPL.isRealGame;
 
     const skipped = Object.keys(results || {}).filter(k => !isRealGame(results[k]));
     if (skipped.length) console.warn("[BPL] ignoring non-game records in /results:", skipped);

@@ -314,6 +314,7 @@
              twenty, first gets two hundred, pay four." Everything below 1st
              is worked out from there. -->
         <label class="tiny muted">Tonight, in dollars</label>
+        <p class="potstate" id="potState"></p>
         <div class="plan3">
           <label class="pl3"><span>Kitty $</span>
             <input class="inp" id="cfgKittyAmt" type="number" inputmode="numeric" min="0" step="10" placeholder="0"></label>
@@ -381,6 +382,11 @@
   const NG = LEAGUE.nextGame;
   const ME_KEY = "bpl_me";
 
+  /* Past results, kept only so the name lists on this page know about
+     players who joined as walk-ins. See BPL.people(). */
+  let pastResults = {};
+  function everyone() { return BPL.people(pastResults); }
+
   document.getElementById("lockedNote").textContent =
     "Check-in, the clock, seating and finalizing live behind the PIN.";
 
@@ -401,7 +407,7 @@
   function fillWhoSelect() {
     const sel = document.getElementById("whoSelect");
     if (sel.options.length > 1) return;
-    LEAGUE.standings.slice()
+    everyone().slice()
       .sort((a, b) => a.name.localeCompare(b.name))
       .forEach(p => {
         const o = document.createElement("option");
@@ -685,7 +691,7 @@
 
   /* ================================================================ ME  */
   function pickMe() {
-    const roster = LEAGUE.standings.map(p => ({ value: p.name, label: p.name, sub: p.fullName }));
+    const roster = everyone().map(p => ({ value: p.name, label: p.name, sub: p.fullName }));
     return UI.pick("Which one are you?", roster).then(v => {
       if (v) { localStorage.setItem(ME_KEY, v); render(); }
       return v;
@@ -808,6 +814,19 @@
       });
     }
 
+    /* A payout plan that cannot make an honest table blocks finalizing, and
+       finding that out at 1am with everyone waiting is the worst possible
+       moment. Chase it the whole time it is wrong. */
+    const planCheck = Game.payouts(Game.pot().net, Game.fieldSize() || 1);
+    if (Game.fieldSize() > 1 && planCheck.error) {
+      items.push({
+        kind: "bad",
+        title: "The payouts don't add up",
+        sub: planCheck.error + " The night can't be finalized until this works.",
+        actions: '<button class="btn btn-sm btn-primary" data-act="gotoMoney">Fix it</button>'
+      });
+    }
+
     if (Game.readyToFinalize()) {
       items.push({
         kind: "good",
@@ -844,6 +863,12 @@
     }
     if (a === "consolidate") doConsolidate(Number(b.dataset.tc) || Game.idealTables());
     if (a === "bounty") askBounty();
+    if (a === "gotoMoney") {
+      if (!document.getElementById("mcDrawer").hidden === false) document.getElementById("btnMaster").click();
+      UI.tab("money");
+      const el = document.getElementById("cfgFirst");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
     if (a === "finalize") doFinalize();
   });
 
@@ -1493,6 +1518,18 @@
     set("cfgFirst", Game.firstPrize());
     set("cfgPlaces", Game.placesPaid());
 
+    /* Nate sets the payouts at the first break, once rebuys are shut and the
+       pot can no longer move. Say which side of that line we're on, because
+       a number set while the pot is still growing is a guess. */
+    const potFinal = !Game.rebuyWindowOpen();
+    const ps = document.getElementById("potState");
+    if (ps) {
+      ps.className = "potstate " + (potFinal ? "final" : "open");
+      ps.textContent = potFinal
+        ? "Rebuys closed — the pot is final at " + BPL.money(m.gross) + "."
+        : "Rebuys still open — the pot can still grow. Nate sets these at the break.";
+    }
+
     const planned = Game.firstPrize() && Game.placesPaid();
     const pn = document.getElementById("planNote");
     if (pn) {
@@ -1501,7 +1538,12 @@
         pn.textContent = plan.error
           ? "⚠ " + plan.error
           : BPL.money(m.net) + " to play for → " +
-            plan.table.map(a => BPL.money(a)).join(" · ");
+            plan.table.map(a => BPL.money(a)).join(" · ") +
+            /* Never move his money without telling him. */
+            (plan.lifted
+              ? "  ·  1st lifted from " + BPL.money(plan.asked) +
+                ", which wasn't enough to keep 2nd behind it."
+              : "");
       } else {
         pn.textContent = "Leave these blank and payouts follow the percentage table below.";
       }
@@ -1543,8 +1585,15 @@
       .then(() => {
         const m = Game.pot();
         const plan = Game.payouts(m.net, m.entries || 1);
+        /* Say back what was STORED, never what was typed. Both numbers get
+           snapped to a $10 note on the way in, and a toast reading "$126 to
+           1st" over a table that pays $130 is the app lying about itself. */
+        const kept = Game.firstPrize(), keptKitty = Game.kittyAmount();
         UI.toast(plan.error ? plan.error
-          : (first === "" ? "Kitty set" : BPL.money(Number(first)) + " to 1st, " + places + " paid"),
+          : (kept === null
+              ? (keptKitty === null ? "Back to percentages"
+                                    : "Kitty set at " + BPL.money(keptKitty))
+              : BPL.money(kept) + " to 1st, " + Game.placesPaid() + " paid"),
           plan.error ? "bad" : "ok");
         render();
       }, e => UI.toast(e.message, "bad"));
@@ -1699,7 +1748,7 @@
   document.getElementById("btnAddPlayer").onclick = () => {
     if (!Admin.require()) return;
     const S = Game.state();
-    const avail = LEAGUE.standings
+    const avail = everyone()
       .filter(p => !S.players[p.name])
       .map(p => ({ value: p.name, label: p.name, sub: p.fullName }));
 
@@ -1945,6 +1994,13 @@
 
 
   Game.subscribe(render);
+  /* Walk-ins become known names once their first night is in the books.
+     The <select> is filled once, so drop it and let it refill. */
+  DB.on("results", v => {
+    pastResults = v || {};
+    const sel = document.getElementById("whoSelect");
+    if (sel) { while (sel.options.length > 1) sel.remove(1); fillWhoSelect(); }
+  });
   render();
 })();
 </script>

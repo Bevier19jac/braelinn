@@ -24,8 +24,10 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
    sessionStorage.setItem('bpl_admin_ok','1');
    await DB.set('results', null); await DB.set('config/money', null);
    /* A prior game so somebody is carrying a bounty. */
+   /* field must match the row count -- that is what finalize guarantees, and
+      what everything reading /results now insists on. */
    await DB.set('results/2026-08-01', {gameId:'2026-08-01',date:'2026-08-01',season:7,label:'Prior',
-     type:'regular',field:6,buyinAmount:30,rebuyAmount:30,rebuys:0,gross:180,kittyPct:0,kitty:0,pot:180,
+     type:'regular',field:2,buyinAmount:30,rebuyAmount:30,rebuys:0,gross:180,kittyPct:0,kitty:0,pot:180,
      bounty:0,bountyOn:null,bountyStreak:0,bountyWonBy:null,winner:'Tod',finalizedAt:1,
      finish:[{place:1,name:'Tod',points:1800,rebuys:0,late:false,winnings:180,bounty:0,itm:true},
              {place:2,name:'Syd',points:1500,rebuys:0,late:false,winnings:0,bounty:0,itm:false,outBy:'Tod'}]});
@@ -128,11 +130,13 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
  ok('a_recap_exists', !!withRecap);
  /* Render it by pointing a game at that date. */
  await p.evaluate(async(d)=>{
+   /* The real 3 Sep record: twelve played, twelve rows, places 1..12. */
+   const names = ['Tod','Tim','Eric C','Guy','Steele','Dave A','Chris F','Greg','Erik V','Jacob','Sprayberry','Nate'];
    await DB.set('results/'+d, {gameId:d,date:d,season:7,label:'Event 1',type:'regular',field:12,
      buyinAmount:30,rebuyAmount:30,rebuys:11,gross:690,kittyPct:20.3,kitty:140,pot:550,
      bounty:0,bountyOn:null,bountyStreak:0,bountyWonBy:null,winner:'Tod',finalizedAt:2,
-     finish:[{place:1,name:'Tod',points:3700,rebuys:1,late:false,winnings:245,bounty:0,itm:true},
-             {place:2,name:'Tim',points:3400,rebuys:1,late:false,winnings:165,bounty:0,itm:true}]});
+     finish: names.map((n,i)=>({place:i+1,name:n,points:(12-i)*300+(i<4?100:0),
+       rebuys: n==='Chris F'?0:1, late:false, winnings:[245,165,85,55][i]||0, bounty:0, itm:i<4}))});
  }, withRecap);
  await p.waitForTimeout(1000);
  ok('recap_renders', await p.locator('.recap').count()>0);

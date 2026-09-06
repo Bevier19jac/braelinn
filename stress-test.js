@@ -427,13 +427,17 @@ async function scenarios() {
   {
     const ctx = loadEngine();
     const { BPL, LEAGUE } = ctx;
+    /* Records the shape finalize writes: the row count matches the field and
+       the places run 1..field. Looser fixtures used to pass here while being
+       exactly the junk the app is supposed to ignore. */
+    const ten = (winner, other) => Array.from({length:10}, (_, i) =>
+      ({ place:i+1, name: i===0 ? winner : (i===9 ? other : "Filler " + i),
+         points:(10-i)*300 + (i<2?100:0), winnings:[150,100][i]||0, itm:i<2 }));
     const results = {
       "2026-09-03": { gameId:"a", date:"2026-09-03", type:"regular", field:10, pot:300, winner:"Nate", finalizedAt:1,
-        finish:[{place:1,name:"Nate",points:3000,winnings:150,itm:true},
-                {place:2,name:"Jacob",points:2700,winnings:100,itm:true}] },
+        finish: ten("Nate","Jacob") },
       "2026-09-17": { gameId:"b", date:"2026-09-17", type:"regular", field:10, pot:300, winner:"Jacob", finalizedAt:2,
-        finish:[{place:1,name:"Jacob",points:3000,winnings:150,itm:true},
-                {place:10,name:"Nate",points:300,winnings:0,itm:false}] }
+        finish: ten("Jacob","Nate") }
     };
     const agg = BPL.aggregate(results);
     const nate  = agg.players.find(p => p.name === "Nate");
@@ -443,7 +447,7 @@ async function scenarios() {
        scoring rule lands -- which is exactly what happened on 5 Sep. */
     const P = (place, itm) => BPL.pointsFor(place, 10, itm);
     const nateTotal  = P(1, true) + P(10, false);
-    const jacobTotal = P(2, true) + P(1, true);
+    const jacobTotal = P(10, false) + P(1, true);
     chk(nate.points === nateTotal, "policy: cumulative total wrong for Nate", { got: nate.points, expect: nateTotal });
     chk(jacob.points === jacobTotal, "policy: cumulative total wrong for Jacob", { got: jacob.points, expect: jacobTotal });
     chk(nate.rawPoints === nateTotal, "policy: rawPoints must always be the full total", { got: nate.rawPoints });
@@ -455,8 +459,12 @@ async function scenarios() {
     chk(nate2.points === P(1, true), "policy: bestN did not apply", { got: nate2.points, expect: P(1, true) });
     chk(nate2.rawPoints === nateTotal, "policy: raw history was altered by policy change",
         { got: nate2.rawPoints });
-    chk(results["2026-09-03"].finish[0].points === 3000,
-        "policy: stored event result was mutated", {});
+    /* The record is a permanent statement of what happened; only the
+       arithmetic over it may move. Compare against what was written, not a
+       literal that goes stale when the fixture changes. */
+    chk(results["2026-09-03"].finish[0].points === ten("Nate","Jacob")[0].points,
+        "policy: stored event result was mutated",
+        { got: results["2026-09-03"].finish[0].points });
     LEAGUE.seasonScoring = { mode: "cumulative" };
   }
 
