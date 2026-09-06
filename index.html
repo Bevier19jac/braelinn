@@ -527,15 +527,21 @@
     tick(); setInterval(tick, 30000);
   })();
 
-  /* -------------------------------------------------------- ANNOUNCEMENT */
-  (function () {
-    const a = BPL.activeAnnouncement();
-    if (!a) return;
-    document.getElementById("announce").innerHTML =
+  /* -------------------------------------------------------- ANNOUNCEMENT
+
+     Derived from the results first -- who is carrying the bounty and for how
+     much -- and only falls back to a typed announcement when there is
+     nothing true to say yet. Re-rendered whenever the results change, so it
+     can never advertise a state of the world that has moved on. */
+  function renderAnnounce() {
+    const a = BPL.newsLine(results, me()) || BPL.activeAnnouncement();
+    const box = document.getElementById("announce");
+    if (!a) { box.innerHTML = ""; return; }
+    box.innerHTML =
       '<div class="announce"><span class="ic">' + UI.esc(a.icon || "📣") + '</span>' +
       '<p><span class="lab">' + UI.esc(a.type === "special" ? "League News" : a.type) + '</span>' +
       UI.esc(a.text) + '</p></div>';
-  })();
+  }
 
   /* ------------------------------------------------------------ SCHEDULE */
   (function () {
@@ -896,8 +902,9 @@
   DB.on(LIVE + "/players", v => { livePlayers = v || {};   renderSeats(); renderLive(); renderRsvp(); });
   DB.on(LIVE + "/seats",   v => { liveSeats   = v || null; renderSeats(); });
   DB.on(LIVE + "/status",  v => { liveStatus  = v || "";   renderLive(); });
-  DB.on("results",         v => { results     = v || {};   renderStandings(); markLoaded("results"); });
+  DB.on("results",         v => { results     = v || {};   renderStandings(); renderAnnounce(); markLoaded("results"); });
 
+  renderAnnounce();
   renderRsvp();
   renderSeats();
   renderStandings();

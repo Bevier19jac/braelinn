@@ -143,7 +143,19 @@ nothing entered twice. Both live in a new "The Season" section on Standings,
 hidden until there is something to show. It says plainly that it counts only
 busts where somebody said who did it.
 
-**The news banner expires on its own.** Jacob: *"season 7 kicked off sept 3 has
+**The news banner writes itself.** Jacob, on the first attempt at a fix:
+*"that league news sucks — the 20 bucks lays on Tods head."* He was right
+twice over: a generic line is weak, and a typed line is a fact kept in a
+second place, which is how it went stale in the first instance.
+
+`BPL.newsLine()` derives it from the finalized results — who won last, how
+long the streak runs, what the bounty is worth — and names him. It also knows
+who is reading: Tod sees "$20 on YOUR head, everybody at that table wants it."
+It moves to the new man the moment somebody else wins, without anyone editing
+anything. The typed announcement is only the fallback for before the first
+game of a season.
+
+**And a typed announcement expires on its own.** Jacob: *"season 7 kicked off sept 3 has
 passed so that announcement is old."* It had been advertising a night that had
 already happened. Announcements now carry `until`, and `activeAnnouncement()`
 drops anything past it whether or not somebody remembered to switch it off —

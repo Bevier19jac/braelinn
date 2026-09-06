@@ -110,6 +110,26 @@ console.log('\n== THE NEWS BANNER EXPIRES ON ITS OWN ==');
   chk(!!onLastDay, 'but still up on the last day itself');
 }
 
+console.log('\n== THE NEWS NAMES WHOEVER IS CARRYING THE MONEY ==');
+{
+  const {BPL}=load();
+  const g=(d,w)=>({date:d,winner:w,field:12,finish:[{place:1,name:w,points:3700}]});
+  const R=a=>{const o={};a.forEach(x=>o[x.date]=x);return o;};
+
+  chk(BPL.newsLine({})===null, 'nothing derivable before the first game');
+  const one = BPL.newsLine(R([g('2026-09-03','Tod')]));
+  chk(!!one && one.text.indexOf('Tod') !== -1, 'names the man', one && one.text);
+  chk(one.text.indexOf('$20') !== -1, 'and the amount');
+  const mine = BPL.newsLine(R([g('2026-09-03','Tod')]), 'Tod');
+  chk(mine.text.indexOf('your head') !== -1, 'speaks to him directly when he is reading it', mine.text);
+  chk(mine.text.indexOf('Tod') === -1, 'and does not talk about him in the third person');
+  const two = BPL.newsLine(R([g('2026-09-03','Tod'), g('2026-09-15','Tod')]));
+  chk(two.text.indexOf('$40') !== -1, 'stacks with the streak', two.text);
+  const beaten = BPL.newsLine(R([g('2026-09-03','Tod'), g('2026-09-15','Syd')]));
+  chk(beaten.text.indexOf('Syd') !== -1 && beaten.text.indexOf('Tod') === -1,
+      'and moves the moment somebody else wins', beaten.text);
+}
+
 console.log('\n== PAYOUTS AT EVERY FIELD SIZE 2..40 ==');
 {
   const {BPL}=load();

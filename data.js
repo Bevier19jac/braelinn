@@ -39,13 +39,14 @@ const LEAGUE = {
      Leave `until` off only for something genuinely timeless.
      ------------------------------------------------------------------------ */
   announcements: [
+    /* Only shown when there is nothing derivable to say -- i.e. before the
+       first game of a season, when nobody is carrying a bounty yet. */
     {
       active: true,
       type: "special",
-      icon: "🎯",
+      icon: "♠",
       until: "2027-05-31",
-      text: "$20 rides on the last winner's head — knock them out and it's yours. " +
-            "Back-to-back wins stack it."
+      text: "Season 7 is on. Win a night and $20 rides on your head the next one."
     }
   ],
 
@@ -802,6 +803,44 @@ const BPL = {
       const [y, m, d] = e.date.split("-").map(Number);
       return new Date(y, m - 1, d) >= todayStart;
     });
+  },
+
+  /**
+   * The banner, built from what is actually true tonight.
+   *
+   * A hand-typed banner is a fact kept in a second place, and it goes stale
+   * the moment the night it describes has happened -- which is exactly what
+   * did happen. This derives the news from the finalized results instead, so
+   * it names the man carrying the money and updates itself the moment
+   * somebody takes it off him. `you` is the reader, if the app knows them.
+   *
+   * Returns null when there is nothing derivable; the typed announcements
+   * are the fallback.
+   */
+  newsLine(results, you) {
+    const b = BPL.bountyOn(results);
+    if (!b || !b.amount) return null;
+
+    const money = BPL.money(b.amount);
+    if (you && you === b.name) {
+      return {
+        icon: "🎯",
+        type: "special",
+        text: b.streak > 1
+          ? money + " on your head, and " + b.streak + " wins in a row. The whole room is coming for you."
+          : money + " on your head — you won the last one. Everybody at that table wants it."
+      };
+    }
+    return {
+      icon: "🎯",
+      type: "special",
+      text: b.streak > 1
+        ? money + " sits on " + b.name + "'s head. " + b.streak +
+          " wins in a row, and it grows another $" + (LEAGUE.bounty.amount) +
+          " every time he takes one down. Knock him out and it's yours."
+        : money + " sits on " + b.name + "'s head — he won the last one. " +
+          "Knock him out and it's yours."
+    };
   },
 
   /**
