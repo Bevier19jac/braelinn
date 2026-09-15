@@ -148,7 +148,8 @@ const LEAGUE = {
     /* Short name is "Matt M" -- "Matt" alone would collide with Matt
        Therriault, and the short name is the database key every RSVP,
        check-in and result is filed under. */
-    { name: "Matt M",     fullName: "Matt McCoy",       reg: true, events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" }
+    { name: "Matt M",     fullName: "Matt McCoy",       reg: true, events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" },
+    { name: "Wes",        fullName: "Wes",              reg: true, events: 0, points: 0, wins: 0, cashes: 0, avgPlace: 0, avatar: "", saying: "" }
   ],
 
   /* --------------------------------------------------------------------------
