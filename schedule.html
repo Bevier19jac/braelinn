@@ -129,38 +129,80 @@
   document.getElementById("dNotes").textContent =
     NG.notes + " Rebuy stack " + BPL.chips(NG.rebuyStack) + " chips. Field cap " + NG.maxPlayers + ".";
 
+  /* Whether a night has happened is NOT a flag anybody remembers to set.
+     `completed: false` sat on every row in data.js from the day it was
+     written, so Event 1 was still being advertised as "Next Up" a fortnight
+     after it was played, and "4 to go" counted two games that were already
+     in the books. The results already know. Ask them. */
+  let results = {};
+
+  function playedRecord(e) {
+    const g = results[e.date];
+    return BPL.isRealGame(g) ? g : null;
+  }
+  function isPastDate(e) {
+    const [y, m, d] = e.date.split("-").map(Number);
+    const n = new Date();
+    return new Date(y, m - 1, d) < new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  }
+  /* Three states, not two: played (a result exists), gone by (the date has
+     passed with nothing recorded -- which is not the same as played, and
+     saying "Played" there would be inventing a game), and still to come. */
+  function stateOf(e) {
+    if (playedRecord(e) || e.completed) return "played";
+    return isPastDate(e) ? "goneby" : "upcoming";
+  }
+
   function row(e, isNext) {
     const [y, m, d] = e.date.split("-").map(Number);
     const dt = new Date(y, m - 1, d);
-    const cls = e.completed ? "done" : (isNext ? "next" : "");
-    const tag = e.completed ? '<span class="tag done">Played</span>'
+    const st = stateOf(e);
+    const rec = playedRecord(e);
+
+    const cls = st === "played" ? "done" : (isNext ? "next" : "");
+    const tag = st === "played"  ? '<span class="tag done">Played</span>'
+              : st === "goneby"  ? '<span class="tag done">No result</span>'
               : isNext ? '<span class="tag final">Next Up</span>'
               : '<span class="tag ' + e.type + '">' + e.type + '</span>';
+
+    /* A played night can say who won and how big it was -- all derived, so
+       it can never disagree with the results page. */
+    const detail = rec
+      ? UI.esc(rec.winner) + " won · " + rec.field + " played" +
+        (rec.pot ? " · " + BPL.money(rec.pot) + " pot" : "")
+      : dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) +
+        (e.note ? " · " + UI.esc(e.note) : "");
+
     return '<div class="sched-row ' + cls + '">' +
       '<div class="sched-date">' + dt.toLocaleDateString("en-US", { month: "short" }).toUpperCase() +
         '<span>' + d + '</span></div>' +
       '<div class="sched-body"><strong>' + UI.esc(e.label) + '</strong><small>' +
-        dt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) +
-        (e.note ? " · " + UI.esc(e.note) : "") + '</small></div>' + tag + '</div>';
+        detail + '</small></div>' + tag + '</div>';
   }
 
-  const up = LEAGUE.schedule.filter(e => !e.completed);
-  const past = LEAGUE.schedule.filter(e => e.completed);
+  function renderSchedule() {
+    const up   = LEAGUE.schedule.filter(e => stateOf(e) === "upcoming");
+    const past = LEAGUE.schedule.filter(e => stateOf(e) !== "upcoming");
 
-  document.getElementById("upCount").textContent =
-    up.length + (up.length === 1 ? " scheduled" : " to go");
-  document.getElementById("upcoming").innerHTML =
-    (up.map((e, i) => row(e, i === 0)).join("") || '<p class="empty">Season complete.</p>') +
-    (up.length < 3
-      ? '<div class="card mt"><p class="tiny muted" style="margin:0">' +
-        '<b>More dates coming.</b> The rest of Season ' + LEAGUE.season +
-        ' shows up here once it\'s set.</p></div>'
-      : "");
+    document.getElementById("upCount").textContent =
+      up.length + (up.length === 1 ? " scheduled" : " to go");
+    document.getElementById("upcoming").innerHTML =
+      (up.map((e, i) => row(e, i === 0)).join("") || '<p class="empty">No dates set yet.</p>') +
+      (up.length < 3
+        ? '<div class="card mt"><p class="tiny muted" style="margin:0">' +
+          '<b>More dates coming.</b> The rest of Season ' + LEAGUE.season +
+          ' shows up here once it\'s set.</p></div>'
+        : "");
 
-  if (past.length) {
-    document.getElementById("pastSec").hidden = false;
-    document.getElementById("past").innerHTML = past.reverse().map(e => row(e, false)).join("");
+    document.getElementById("pastSec").hidden = !past.length;
+    if (past.length) {
+      document.getElementById("past").innerHTML =
+        past.slice().reverse().map(e => row(e, false)).join("");
+    }
   }
+
+  renderSchedule();
+  DB.on("results", v => { results = v || {}; renderSchedule(); });
 
   /* Blind structure table with cumulative elapsed time */
   let elapsed = 0;

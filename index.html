@@ -300,8 +300,43 @@
            new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }
 
-  (function applyCalendarGuard() {
-    if (!nothingScheduled()) return;
+  /**
+   * A game that runs past midnight is still tonight's game.
+   *
+   * The guard below decides "past" from the calendar date, which is right
+   * for a season that has run out and wrong for a tournament still being
+   * played at 1am -- and the 15 Sep game was still nine-handed when the
+   * date rolled over. For a few hours the front page told everyone the
+   * season had no next game while they were sitting at the table.
+   *
+   * So: a scheduled night stays current until it is finalized. Live players
+   * on the board and no result written means the night is still happening,
+   * whatever the clock says.
+   */
+  function stillBeingPlayed() {
+    const g = BPL.currentGame();
+    if (!g) return false;
+    if (results && results[g.date]) return false;      // it's in the books
+    return Object.keys(livePlayers || {}).length > 0;  // people on the board
+  }
+
+  function applyCalendarGuard() {
+    const none = document.getElementById("noneSec");
+    const hero = document.querySelector("header.hero");
+    const show = nothingScheduled() && !stillBeingPlayed();
+
+    /* Re-runnable: the live board arrives after first paint, and a night in
+       progress has to be able to put the page back the way it was. */
+    if (!show) {
+      if (none) none.hidden = true;
+      if (hero) hero.hidden = false;
+      ["rsvp", "seats"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.hidden = false;
+      });
+      return;
+    }
+
     const last = BPL.currentGame();
     document.getElementById("noneSec").hidden = false;
     document.querySelector("header.hero").hidden = true;
@@ -320,7 +355,8 @@
               (LEAGUE.schedule.length === 1 ? "" : "s") + " on the calendar");
     document.getElementById("noneMeta").innerHTML =
       bits.map(b => "<span>" + b + "</span>").join("");
-  })();
+  }
+  applyCalendarGuard();
 
   /* --------------------------------------------------------- WHO AM I
 
@@ -902,10 +938,12 @@
 
   /* ------------------------------------------------------------ BINDINGS */
   DB.on(RSVP,             v => { rsvpState   = v || {};   renderRsvp(); markLoaded("rsvp"); });
-  DB.on(LIVE + "/players", v => { livePlayers = v || {};   renderSeats(); renderLive(); renderRsvp(); });
+  DB.on(LIVE + "/players", v => { livePlayers = v || {};   renderSeats(); renderLive(); renderRsvp();
+                                 applyCalendarGuard(); });   // a night in progress outranks the calendar
   DB.on(LIVE + "/seats",   v => { liveSeats   = v || null; renderSeats(); });
   DB.on(LIVE + "/status",  v => { liveStatus  = v || "";   renderLive(); });
   DB.on("results",         v => { results     = v || {};   renderStandings(); renderAnnounce();
+                                 applyCalendarGuard();
                                  /* A walk-in only becomes a name the lists know once his
                                     first result lands, so both lists re-render here. */
                                  if (!gate.hidden) renderSignInList();

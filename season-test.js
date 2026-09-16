@@ -65,7 +65,14 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
 
  /* A second night: a worse hand, and a different set of knockouts. */
  await p.evaluate(async(F)=>{
-   await DB.set('results/2026-10-01', {gameId:'2026-10-01',date:'2026-10-01',season:7,label:'Event 2',
+   /* The day AFTER the live night, derived -- never a hard-coded date.
+      This fixture used to say "2026-10-01", which stopped being a free slot
+      the moment Event 3 was put on the calendar: the live night finalized
+      to that same id and the fixture overwrote it. A test that owns a date
+      the league might one day use is a test with an expiry date on it. */
+   const D = new Date(Date.parse(LEAGUE.nextGame.date + 'T00:00:00Z') + 86400000)
+               .toISOString().slice(0,10);
+   await DB.set('results/' + D, {gameId:D,date:D,season:7,label:'Event 2',
      type:'regular',field:6,buyinAmount:30,rebuyAmount:30,rebuys:0,gross:180,kittyPct:0,kitty:0,pot:180,
      bounty:0,bountyOn:null,bountyStreak:0,bountyWonBy:null,winner:'Syd',finalizedAt:9,
      highHand:{name:'Jacob',cat:'flush',at:1},

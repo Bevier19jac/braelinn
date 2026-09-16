@@ -861,22 +861,67 @@
      * When the busted player is carrying the bounty, the same answer credits
      * it. One question, not two.
      */
-    confirmOut(name, reportId, killer) {
-      if (Game.active().indexOf(name) === -1) return Promise.resolve(null);
-      /* The player's own answer stands unless the host names someone else. */
-      const said = killer || Game.reportedBy(name);
+    /**
+     * The write that puts someone out, shared by every path that does it.
+     * `at` is the moment they were ACTUALLY out -- never the moment the app
+     * got round to recording it. Finishing places are derived from bustAt,
+     * so that distinction is the whole finishing order.
+     */
+    _bustPatch(name, at, said) {
       const by = (said && said !== name && S.players[said]) ? said : null;
-
       const patch = {};
       patch[BASE + "/players/" + name + "/status"] = "out";
-      patch[BASE + "/players/" + name + "/bustAt"] = DB.now();
+      patch[BASE + "/players/" + name + "/bustAt"] = at;
       if (by) patch[BASE + "/players/" + name + "/outBy"] = by;
-      if (reportId) patch[BASE + "/reports/" + reportId] = null;
 
       const t = Game.bountyTarget();
       if (by && t && t.name === name && t.amount && !Game.bountyClaimed()) {
         patch[BASE + "/bounty"] = { target: name, amount: t.amount, wonBy: by, at: DB.now() };
       }
+      return patch;
+    },
+
+    /**
+     * A player closing their own night. OUT IS OUT -- no host confirmation.
+     *
+     * This used to file a report and wait, and the finishing place was
+     * stamped when the host confirmed it rather than when the player said
+     * it. On 15 Sep that cost a real place: Jacob tapped out at 10:31:35,
+     * Nate marked Pettis out at 10:31:51, and got round to confirming Jacob
+     * at 10:32:26 -- so the record had Jacob outlasting a man he had already
+     * finished behind. The host was a middleman who could only make the
+     * timestamp wrong.
+     *
+     * A mis-tap is undone with Reinstate, which is one tap and puts them
+     * back in their seat. A wrong finishing order is not noticed until the
+     * season is scored, if ever. The cheap mistake is the recoverable one.
+     */
+    selfOut(name, killer) {
+      if (!name) return Promise.reject(new Error("Say who you are first"));
+      if (Game.active().indexOf(name) === -1) return Promise.resolve(Game.placeOf(name));
+
+      const patch = Game._bustPatch(name, DB.now(), killer);
+      /* Nothing is left for the host to confirm, so clear anything queued. */
+      Game.pendingReports().forEach(r => {
+        if (r.name === name && r.type === "out") patch[BASE + "/reports/" + r.id] = null;
+      });
+
+      return DB.save(name + " out", () => DB.multi(patch))
+        .then(() => Game.placeOf(name));
+    },
+
+    confirmOut(name, reportId, killer) {
+      if (Game.active().indexOf(name) === -1) return Promise.resolve(null);
+      /* The player's own answer stands unless the host names someone else. */
+      const said = killer || Game.reportedBy(name);
+
+      /* If they already said they were out, that is when they were out.
+         Confirming is the host catching up with a fact, not creating it. */
+      const r = Game.pendingReports().find(x => x.name === name && x.type === "out");
+      const at = (r && r.at) || DB.now();
+
+      const patch = Game._bustPatch(name, at, said);
+      if (reportId) patch[BASE + "/reports/" + reportId] = null;
 
       return DB.save(name + " out", () => DB.multi(patch))
         .then(() => Game.placeOf(name));

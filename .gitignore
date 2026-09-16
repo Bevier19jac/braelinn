@@ -9,3 +9,5 @@ home-restored.png
 # Transfer scratch — never part of the site.
 _x/
 _to_delete/
+*.tgz
+*.tar.gz

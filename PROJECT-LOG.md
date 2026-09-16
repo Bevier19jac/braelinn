@@ -113,6 +113,63 @@ standings now ignore anything that isn't a real finalized tournament.
 
 ## 9. Work log
 
+### 16 Sep — out is out, and a game that ran past midnight
+
+**Event 2 played 15 Sep. Phil T won, 15 players, $900 through the door.**
+
+**The bug that cost a finishing place.** Jacob tapped "I'm out" at 10:31:35.
+Nate marked Pettis out at 10:31:51. Nate confirmed Jacob at 10:32:26 — and
+`confirmOut` stamped `bustAt` at the moment of confirmation. Finishing places
+derive from `bustAt`, so the record had Jacob outlasting a man he had already
+finished behind. The host was a middleman who could only make the timestamp
+wrong.
+
+Fixed live, mid-game, before finalizing: Jacob's `bustAt` reset to his own
+report time. He finalized 12th, Pettis 11th — correct.
+
+Fixed in code two ways, because either path could lie:
+
+- `Game.selfOut(name, killer)` — **out is out**. The player's tap records the
+  place immediately and clears anything queued for the host. No confirmation.
+- `Game.confirmOut()` — when a report exists, stamps the **report's** time,
+  not the confirm time. A slow host cannot reorder the table on either path.
+- Both share `Game._bustPatch(name, at, said)`, so there is one definition of
+  what "out" writes and `at` is always when they were actually out.
+
+*Mis-taps stay cheap: Reinstate puts them back, seat and all. A wrong
+finishing order is not noticed until the season is scored, if ever. The
+cheap mistake should be the recoverable one.*
+
+**Master control can enter a high hand.** Previously only claimable from your
+own seat, and half the room never opens the app. The host's entry always wins
+— if he is typing it in, he has been told what it was. Erik V's quad 10s with
+an ace kicker is the season high hand, entered this way.
+
+**A game that runs past midnight is still tonight's game.** The calendar guard
+decides "past" from the date, which is right for a season that has run out and
+wrong for a tournament still being played at 1am. For a few hours the front
+page told fifteen men the season had no next game while nine of them were
+sitting at the table. `applyCalendarGuard()` is now re-runnable and consults
+live state: a scheduled night stays current until it is finalized.
+
+**A test that owned a date the league might use.** `season-test.js` wrote a
+fixture to `results/2026-10-01`. That stopped being a free slot the moment
+Event 3 was scheduled — the live night finalized to the same id and the
+fixture overwrote it. The fixture date is now derived from the live night.
+
+**Calendar:** Event 3 on Thu 1 Oct, Event 4 on Thu 15 Oct. **Roster:** Wes
+added (38). **Recap:** Event 2 written.
+
+*Ordering that matters: `BPL.currentGame()` picks the first scheduled date
+from today forward, so adding a future event while a night is unfinalized
+repoints `nextGame.date` and the live game vanishes from master control.
+Finalize first, then schedule.*
+
+**New tests:** `outisout-test.js` (replays 15 Sep exactly), `calendar-test.js`
+(guard fires when the season ends, not mid-game, returns once finalized).
+`knockout-test.js` and `selfserve-test.js` updated — they asserted the old
+"wait for Nate" rule. **27 suites green.**
+
 ### 6 Sep — a smoke-test campaign, and the eight bugs it found
 
 Ran an adversarial sweep before Event 2: five new hunt suites, a full parameter

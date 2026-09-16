@@ -58,15 +58,20 @@ const LEAGUE = {
   schedule: [
     { date: "2026-09-03", label: "Event 1", type: "regular", completed: false, note: "Season 7 Kickoff" }
     , { date: "2026-09-15", label: "Event 2", type: "regular", completed: false, note: "" }
+    , { date: "2026-10-01", label: "Event 3", type: "regular", completed: false, note: "" }
+    , { date: "2026-10-15", label: "Event 4", type: "regular", completed: false, note: "" }
 
     /* ---- ADD THE REST HERE AS THE DATES COME IN -------------------------
        Copy a line, change the date and number. Keep them in date order.
 
-       , { date: "2026-09-15", label: "Event 2", type: "regular", completed: false, note: "" }
-       , { date: "2026-09-29", label: "Event 3", type: "regular", completed: false, note: "" }
+       The dates below are PLACEHOLDERS, not real events -- they used to be
+       plausible-looking ones, which made this comment read like part of the
+       schedule and made a search for a date match twice.
+
+       , { date: "YYYY-MM-DD", label: "Event N", type: "regular", completed: false, note: "" }
 
        When you get to the end of the season, add the final:
-       , { date: "2027-05-08", label: "Season 7 Final", type: "final", completed: false, note: "" }
+       , { date: "YYYY-MM-DD", label: "Season 7 Final", type: "final", completed: false, note: "" }
 
        type: "regular" | "tournament" | "final"
        --------------------------------------------------------------------- */
@@ -295,7 +300,36 @@ const LEAGUE = {
 
       "$690 through the door. $140 to the season kitty. $550 across four places. " +
       "Tod leads the table with 3,700, and everyone else has the rest of the " +
-      "season to do something about it."
+      "season to do something about it.",
+
+    "2026-09-15":
+      "Fifteen came. Fifteen rebought. Not fourteen, not most of them \u2014 every " +
+      "single man who sat down at Nate's reached for a second thirty before the " +
+      "break, and the pot swelled to $900 on the strength of collective weakness. " +
+      "Opening night at least had Chris F holding out. This time nobody did.\n\n" +
+
+      "Phil T had not played a hand of Season 7. He turned up for his first night, " +
+      "outlasted fourteen people who had, and left with $310. There is no graceful " +
+      "way for the rest of the field to describe that.\n\n" +
+
+      "Tod arrived wearing the first bounty of the season \u2014 $20 on his head for " +
+      "winning the opener \u2014 and Sprayberry took it off him in sixth. Sprayberry " +
+      "finished fifth, out of the money, and still went home with cash. The bounty " +
+      "now rides on Phil T. Win again on 1 October and it becomes $40.\n\n" +
+
+      "Erik V made four tens with an ace kicker. It is the best hand anyone has " +
+      "shown all season and it stands as the high hand until somebody beats it. He " +
+      "finished thirteenth. Quads in the middle of the night and out before the " +
+      "last table \u2014 that is poker, and nobody has ever found it funnier than the " +
+      "twelve men who finished above him.\n\n" +
+
+      "Steele took second for $190, Eric C third for $130, Guy fourth for $70. " +
+      "Which leaves the season table an odd shape: Eric C is top of the standings " +
+      "on 7,100 points without winning a single night. Two events, two cashes, no " +
+      "trophies. Tod and Steele are level behind him on 6,700.\n\n" +
+
+      "$900 through the door. $180 to the season kitty, $320 banked so far. $700 " +
+      "across four places, and $20 to Sprayberry for the scalp."
   },
 
   /* --------------------------------------------------------------------------

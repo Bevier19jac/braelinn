@@ -56,18 +56,19 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
  ok('they_are_asked_who_got_them', (await p.locator('.sheet h3').last().innerText()).includes('Who got you'));
  ok('rather_not_say_is_offered', (await p.locator('.sheet [data-skip]').last().innerText()).includes('Rather not say'));
  await p.locator('.sheet .pickrow', {hasText:'Jacob'}).last().click(); await p.waitForTimeout(1000);
- ok('the_report_carries_it', await p.evaluate(()=>Game.reportedBy('Aaron'))==='Jacob');
- ok('but_they_are_not_out_yet', await p.evaluate(()=>Game.active().indexOf('Aaron')!==-1));
+ /* OUT IS OUT. The tap closes the night then and there -- it used to file a
+    report and wait on the host, which stamped the finishing place at
+    confirmation time and got the order wrong on 15 Sep. */
+ ok('they_are_out_on_their_own_say_so', await p.evaluate(()=>Game.active().indexOf('Aaron')===-1));
+ ok('with_the_players_answer', await p.evaluate(()=>Game.outBy('Aaron'))==='Jacob');
+ ok('and_a_place_is_recorded', await p.evaluate(()=>Game.placeOf('Aaron')) > 0,
+    await p.evaluate(()=>Game.placeOf('Aaron')));
 
- console.log('\n== AND THE HOST JUST CONFIRMS IT ==');
+ console.log('\n== AND THE HOST HAS NOTHING LEFT TO CONFIRM ==');
  await p.evaluate(()=>{ localStorage.setItem('bpl_me','Nate'); sessionStorage.setItem('bpl_admin_ok','1'); });
  await p.goto(B+'game.html',{waitUntil:'networkidle'}); await p.waitForTimeout(1200);
- /* The action queue lives on the page itself, not in the drawer -- so leave
-    the drawer shut, the way Nate would when he's watching the room. */
- await p.locator('#queue button[data-act="confirmOut"]').first().click(); await p.waitForTimeout(1000);
- ok('confirmed_without_a_question', await p.locator('.sheet').count()===0);
- ok('aaron_is_out', await p.evaluate(()=>Game.active().indexOf('Aaron')===-1));
- ok('with_the_players_answer', await p.evaluate(()=>Game.outBy('Aaron'))==='Jacob');
+ ok('the_queue_is_clear', await p.locator('#queue button[data-act="confirmOut"]').count()===0);
+ ok('aaron_is_still_out', await p.evaluate(()=>Game.active().indexOf('Aaron')===-1));
 
  console.log('\n== THE BOUNTY IS CREDITED BY THE SAME ANSWER ==');
  const t = await p.evaluate(()=>Game.bountyTarget());

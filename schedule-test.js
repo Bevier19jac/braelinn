@@ -58,6 +58,87 @@ const ok=(k,c,d)=>{ console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!==undefined?'  
    ok('never_advertises_a_past_date', !(st.rsvp && !expectRsvp));
    await c.close();
  }
+ /* ---------------------------------------------------------------------
+    THE SCHEDULE PAGE ITSELF. "Upcoming" used to split on a `completed:`
+    flag in data.js that nobody ever set, so a fortnight after Event 1 was
+    played the page still called it "Next Up" and counted it among the games
+    "to go". Whether a night happened is already recorded in /results.
+    --------------------------------------------------------------------- */
+ console.log('\n== THE SCHEDULE PAGE KNOWS WHAT HAS BEEN PLAYED ==');
+ {
+   const c = await b.newContext({viewport:{width:390,height:844}});
+   await c.route('**/gstatic.com/**', r=>r.abort());
+   const p = await c.newPage();
+   await p.goto('http://localhost:8941/schedule.html',{waitUntil:'networkidle'});
+
+   /* Record a result for every date except the last two. */
+   const seeded = await p.evaluate(async DATES => {
+     await DB.set('results', null);
+     const played = DATES.slice(0, Math.max(0, DATES.length - 2));
+     for (const d of played) {
+       await DB.set('results/' + d, {
+         gameId: d, date: d, finalizedAt: Date.parse(d), winner: 'Tod', field: 4, pot: 120,
+         finish: [1,2,3,4].map(i => ({ place:i, name:['Tod','Syd','Guy','Nate'][i-1],
+                                       itm:i<3, winnings: i===1?80:(i===2?40:0) }))
+       });
+     }
+     return played;
+   }, dates);
+   await p.waitForTimeout(1200);
+
+   const view = await p.evaluate(() => ({
+     count: document.getElementById('upCount').textContent,
+     upcoming: [...document.querySelectorAll('#upcoming .sched-row')].map(r =>
+       (r.querySelector('strong')||{}).textContent + ' | ' +
+       (r.querySelector('.tag')||{}).textContent),
+     past: [...document.querySelectorAll('#past .sched-row')].map(r =>
+       (r.querySelector('strong')||{}).textContent + ' | ' +
+       (r.querySelector('.tag')||{}).textContent + ' | ' +
+       (r.querySelector('small')||{}).textContent),
+     pastHidden: document.getElementById('pastSec').hidden
+   }));
+   say('upCount', view.count);
+   say('upcoming', view.upcoming);
+   say('past', view.past);
+
+   const expectUp = dates.length - seeded.length;
+   ok('counts_only_games_still_to_come',
+      view.count.indexOf(String(expectUp)) === 0, {count: view.count, expect: expectUp});
+   ok('upcoming_lists_only_those', view.upcoming.length === expectUp, view.upcoming);
+   ok('no_played_game_is_tagged_next_up',
+      !view.past.some(r => /Next Up/i.test(r)), view.past);
+   ok('exactly_one_next_up',
+      view.upcoming.filter(r => /Next Up/i.test(r)).length === 1, view.upcoming);
+   /* Name the date, not just "something is tagged Next Up" -- an assertion
+      that cannot fail is worse than no assertion. */
+   const earliestUnplayed = dates.filter(d => seeded.indexOf(d) === -1).sort()[0];
+   const nextUpLabel = await p.evaluate(D => {
+     const e = LEAGUE.schedule.find(x => x.date === D);
+     return e ? e.label : null;
+   }, earliestUnplayed);
+   ok('the_next_up_is_the_earliest_unplayed_date',
+      /Next Up/i.test(view.upcoming[0] || '') &&
+      (view.upcoming[0] || '').indexOf(nextUpLabel + ' |') === 0,
+      {row: view.upcoming[0], expected: nextUpLabel, date: earliestUnplayed});
+   ok('played_games_are_marked_played',
+      view.past.length === seeded.length && view.past.every(r => /Played/.test(r)), view.past);
+   ok('and_say_who_won', view.past.every(r => /Tod won/.test(r)), view.past[0]);
+
+   /* A date that has gone by with nothing recorded is NOT "played" -- the
+      app must not invent a game that was never finalized. */
+   const goneBy = await p.evaluate(async DATES => {
+     await DB.set('results', null);
+     return new Promise(r => setTimeout(() => r(
+       [...document.querySelectorAll('#past .sched-row')].map(x =>
+         (x.querySelector('.tag')||{}).textContent)), 900));
+   }, dates);
+   say('past dates with no result', goneBy);
+   ok('never_claims_a_game_was_played_without_a_record',
+      goneBy.every(t => !/Played/.test(t)), goneBy);
+
+   await c.close();
+ }
+
  await b.close();srv.close();
  console.log(fails.length? '\n'+fails.length+' FAILED: '+[...new Set(fails)].join(', ') : '\nPASSED — a past date is never shown as the next game');
  process.exit(fails.length?1:0);

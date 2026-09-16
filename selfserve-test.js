@@ -55,29 +55,36 @@ const openMine = async p => { await p.locator('.bseat.mine').click(); await p.wa
  /* And they're asked who got them -- their own answer, not the host's job. */
  ok('asked_who_got_them', (await p.locator('.sheet h3').last().innerText()).includes('Who got you'));
  await p.locator('.sheet .pickrow', {hasText:'Nate'}).last().click(); await p.waitForTimeout(900);
- ok('their_answer_is_on_the_report', await p.evaluate(()=>Game.reportedBy('Syd'))==='Nate');
- const rep = await p.evaluate(()=>Game.pendingReports().map(r=>r.name+':'+r.type));
- say('reports', rep);
- ok('report_sent', rep.includes('Syd:out'));
- ok('still_active_until_confirmed', await p.evaluate(()=>Game.active().indexOf('Syd')!==-1));
- ok('no_place_recorded', await p.evaluate(()=>Game.placeOf('Syd'))===null,
+ /* OUT IS OUT -- the tap records the place then and there. Waiting on the
+    host is what got the 15 Sep order wrong. */
+ ok('their_answer_is_recorded', await p.evaluate(()=>Game.outBy('Syd'))==='Nate');
+ ok('out_immediately', await p.evaluate(()=>Game.active().indexOf('Syd')===-1));
+ ok('place_recorded', typeof (await p.evaluate(()=>Game.placeOf('Syd')))==='number',
     await p.evaluate(()=>Game.placeOf('Syd')));
- await openMine(p);
- ok('sheet_says_waiting', (await p.locator('#ssBust').innerText()).toLowerCase().includes('waiting'));
- await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+ ok('nothing_left_pending', await p.evaluate(()=>Game.pendingReports().length)===0);
+ /* Once you are out the felt is not your screen any more, so the place is
+    told to you on the page itself rather than inside your seat. */
+ const told = await p.evaluate(() => {
+   const t = document.body.innerText;
+   const place = Game.placeOf('Syd');
+   const ord = Game.ordinal(place);
+   /* The exact ordinal has to be on the screen -- not merely the word
+      "finished" somewhere in a banner. */
+   const hit = (t.match(new RegExp('[^\\n]*\\b' + ord + '\\b[^\\n]*')) || [])[0] || '';
+   return { place, ord, shown: t.indexOf(ord) !== -1, line: hit.trim().slice(0, 80) };
+ });
+ say('what the page tells them', told);
+ ok('the_page_names_their_exact_finishing_place', told.shown && told.place === 6, told);
 
- console.log('\n== THE HOST SEES IT AND CONFIRMS ==');
+ console.log('\n== AND THE HOST IS NOT CHASED ABOUT IT ==');
  await p.evaluate(()=>{sessionStorage.setItem('bpl_admin_ok','1');});
  await p.goto(B+'game.html',{waitUntil:'networkidle'}); await p.waitForTimeout(1200);
  const q = await p.locator('#queue').innerText();
  say('queue', q.replace(/\n+/g,' | ').slice(0,160));
- ok('queue_shows_the_report', q.includes('Syd'));
- await p.evaluate(()=>{const r=Game.pendingReports().find(x=>x.name==='Syd');return Game.confirmOut('Syd', r&&r.id);});
- await p.waitForTimeout(700);
- ok('the_knockout_carried_through', await p.evaluate(()=>Game.outBy('Syd'))==='Nate');
- ok('now_out', await p.evaluate(()=>Game.active().indexOf('Syd')===-1));
- ok('place_recorded', typeof (await p.evaluate(()=>Game.placeOf('Syd')))==='number');
- ok('report_cleared', await p.evaluate(()=>Game.pendingReports().length)===0);
+ ok('no_confirm_button_for_syd',
+    await p.locator('#queue button[data-act="confirmOut"]').count()===0);
+ ok('still_out', await p.evaluate(()=>Game.active().indexOf('Syd')===-1));
+ ok('killer_still_credited', await p.evaluate(()=>Game.outBy('Syd'))==='Nate');
 
  console.log('\n== AND THEIR TOP-UP IS IN THE FINAL RECORD ==');
  const rec = await p.evaluate(async()=>{
