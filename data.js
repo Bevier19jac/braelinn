@@ -60,6 +60,7 @@ const LEAGUE = {
     , { date: "2026-09-15", label: "Event 2", type: "regular", completed: false, note: "" }
     , { date: "2026-10-01", label: "Event 3", type: "regular", completed: false, note: "" }
     , { date: "2026-10-15", label: "Event 4", type: "regular", completed: false, note: "" }
+    , { date: "2026-10-22", label: "Event 5", type: "regular", completed: false, note: "" }
 
     /* ---- ADD THE REST HERE AS THE DATES COME IN -------------------------
        Copy a line, change the date and number. Keep them in date order.
