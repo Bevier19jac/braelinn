@@ -358,11 +358,22 @@ const note = (night, what, detail) => {
    const paidPlaces = rows.filter(r => r.winnings > 0).length;
    if (paidPlaces > game.field) note(night,'paid more places than there were players',[paidPlaces, game.field]);
    if (game.pot > 0 && !paidPlaces) note(night,'a pot with nobody paid from it', game.pot);
-   const stray = rows.filter(r => r.winnings && !r.bounty && r.winnings % 10);
+   /* No bounty exemption: winnings is pool money, always a multiple of ten. */
+   const stray = rows.filter(r => r.winnings && r.winnings % 10);
    if (stray.length) note(night,'a payout was not a multiple of $10', stray.map(r=>r.name+':'+r.winnings));
    if (game.kitty % 10) note(night,'kitty is not a multiple of $10', game.kitty);
+   /* The pool column must reconcile against the pot, full stop. This used to
+      expect pot + bounty, which was not a check at all -- it encoded the very
+      bug it should have caught, so correct data would have FAILED it. The
+      bounty is counted on its own line below. */
    const handed = rows.reduce((a,r)=>a+(r.winnings||0),0);
-   if (handed !== game.pot + (game.bounty||0)) note(night,'money does not balance',{handed, pot:game.pot, bounty:game.bounty});
+   if (handed !== game.pot) note(night,'pool money does not balance',{handed, pot:game.pot});
+   const bountyPaid = rows.reduce((a,r)=>a+(r.bounty||0),0);
+   if (bountyPaid !== (game.bounty||0)) note(night,'bounty charged but not credited to anybody',
+     {bountyPaid, charged:game.bounty||0});
+   const foldedIn = rows.filter(r => r.bounty && r.winnings && r.winnings % 10 !== 0);
+   if (foldedIn.length) note(night,'a bounty looks folded into winnings again',
+     foldedIn.map(r=>r.name+':'+r.winnings));
    if (game.pot !== game.gross - game.kitty - (game.bounty||0)) note(night,'pot != gross - kitty - bounty',
      {gross:game.gross, kitty:game.kitty, bounty:game.bounty, pot:game.pot});
    if (game.bounty && !game.bountyWonBy) note(night,'a bounty was charged but never credited');

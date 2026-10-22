@@ -112,12 +112,33 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
  const syd = rec.finish.find(r=>r.name==='Syd');
  say('Syd row', syd);
  ok('syd_credited', syd.bounty===40);
- ok('syd_winnings_include_it', syd.winnings >= 40);
+ /* His winnings are POOL money only. The $40 lives in its own field -- storing
+    it in both is what made the results page disagree with itself. THE bug:
+    a bounty winner who busted out of the money used to show winnings of $40. */
+ ok('syd_winnings_exclude_the_bounty',
+    syd.itm ? (syd.winnings > 0 && syd.winnings % 10 === 0) : syd.winnings === 0,
+    {itm:syd.itm, winnings:syd.winnings, bounty:syd.bounty});
+ /* ...but the season table must still show him up by the $40, or fixing the
+    column would have quietly deleted bounty money from the record. */
+ const sydSeason = await p.evaluate(async () => {
+   const res = await new Promise(r => DB.on('results', v => r(v || {})));
+   const row = BPL.aggregate(res).players.find(x => x.name === 'Syd');
+   return row ? { winnings: row.winnings, cashes: row.cashes } : null;
+ });
+ say('Syd season', sydSeason);
+ ok('season_money_still_counts_the_bounty', sydSeason && sydSeason.winnings >= 40, sydSeason);
+ ok('a_bounty_out_of_the_money_is_not_a_cash',
+    sydSeason && (syd.itm ? sydSeason.cashes >= 1 : sydSeason.cashes === 0),
+    {itm:syd.itm, cashes:sydSeason && sydSeason.cashes});
  const paid = rec.finish.filter(r=>r.itm);
  ok('itm_rows_got_the_bonus', paid.every(r=>r.points % 300 === 100), paid.map(r=>r.name+':'+r.points));
  ok('non_itm_rows_did_not', rec.finish.filter(r=>!r.itm).every(r=>r.points % 300 === 0));
  const total = rec.finish.reduce((a,r)=>a+(r.winnings||0),0);
- ok('all_money_accounted_for', total === rec.pot + rec.bounty, {paidOut:total, pot:rec.pot, bounty:rec.bounty});
+ ok('pool_money_balances_exactly', total === rec.pot, {paidOut:total, pot:rec.pot});
+ const bountyTotal = rec.finish.reduce((a,r)=>a+(r.bounty||0),0);
+ ok('bounty_credited_once', bountyTotal === rec.bounty, {bountyTotal, charged:rec.bounty});
+ ok('collected_equals_handed_out', rec.gross === rec.kitty + total + bountyTotal,
+    {gross:rec.gross, kitty:rec.kitty, pool:total, bounty:bountyTotal});
 
  console.log('\n== AND THE STREAK RESET ==');
  await p.waitForTimeout(600);
@@ -164,7 +185,13 @@ const fails=[];const ok=(k,c,d)=>{console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!=
    const tod = out.rec.finish.find(r=>r.name==='Tod');
    ok('credited_on_his_row', tod.bounty===20, tod);
    const handed = out.rec.finish.reduce((a,r)=>a+(r.winnings||0),0);
-   ok('money_balances', handed === out.rec.pot + out.rec.bounty, {handed, pot:out.rec.pot, bounty:out.rec.bounty});
+   ok('pool_money_balances', handed === out.rec.pot, {handed, pot:out.rec.pot});
+   /* He keeps his own bounty, and it is credited once -- on his row, in the
+      bounty field, NOT added into the pool column as well. */
+   const bt = out.rec.finish.reduce((a,r)=>a+(r.bounty||0),0);
+   ok('his_own_bounty_credited_once', bt === out.rec.bounty, {bt, charged:out.rec.bounty});
+   ok('collected_all_accounted_for', out.rec.gross === out.rec.kitty + handed + bt,
+      {gross:out.rec.gross, kitty:out.rec.kitty, pool:handed, bounty:bt});
    await c2.close();
  }
 

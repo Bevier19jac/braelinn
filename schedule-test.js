@@ -71,10 +71,24 @@ const ok=(k,c,d)=>{ console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!==undefined?'  
    const p = await c.newPage();
    await p.goto('http://localhost:8941/schedule.html',{waitUntil:'networkidle'});
 
-   /* Record a result for every date except the last two. */
-   const seeded = await p.evaluate(async DATES => {
+   /* Record a result for every date that has actually GONE BY.
+      This used to seed "all but the last two", which is not a fact about
+      anything -- it is a guess about where today sits in the calendar, and it
+      expired the moment a game was played. It has now broken twice: once when
+      Event 3 passed, once when Event 4 did. Derive it from today instead and
+      it can never go stale again. A game on today's own date is still to come,
+      because an event stays current through its own calendar day. */
+   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+   const hasGoneBy = iso => {
+     const [y,m,d] = iso.split('-').map(Number);
+     return new Date(y, m-1, d) < todayStart;
+   };
+   const toSeed = dates.filter(hasGoneBy);
+   console.log('  today:', todayStart.toDateString());
+   console.log('  seeding results for:', toSeed.join(', ') || '(none)');
+   console.log('  expecting still to come:', dates.filter(d=>!hasGoneBy(d)).join(', ') || '(none)');
+   const seeded = await p.evaluate(async played => {
      await DB.set('results', null);
-     const played = DATES.slice(0, Math.max(0, DATES.length - 2));
      for (const d of played) {
        await DB.set('results/' + d, {
          gameId: d, date: d, finalizedAt: Date.parse(d), winner: 'Tod', field: 4, pot: 120,
@@ -83,7 +97,7 @@ const ok=(k,c,d)=>{ console.log('  '+(c?'ok  ':'FAIL')+'  '+k+(d!==undefined?'  
        });
      }
      return played;
-   }, dates);
+   }, toSeed);
    await p.waitForTimeout(1200);
 
    const view = await p.evaluate(() => ({

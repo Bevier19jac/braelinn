@@ -1081,7 +1081,13 @@
           rebuys: p.rebuys || 0,
           late: !!p.late,
           outBy: p.outBy || null,
-          winnings: win + bnty,
+          /* Pool money ONLY. The bounty came off the top before the pay table
+             was built, and it has its own field below -- adding it here too
+             made sum(winnings) overshoot the pot by the bounty every time one
+             was claimed, so the results page printed "Paid out $750" beside a
+             column that added to $770. Season money totals add the two back
+             together; see BPL.aggregate. */
+          winnings: win,
           bounty: bnty,
           itm: itm
         };

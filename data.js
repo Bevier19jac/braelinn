@@ -61,6 +61,7 @@ const LEAGUE = {
     , { date: "2026-10-01", label: "Event 3", type: "regular", completed: false, note: "" }
     , { date: "2026-10-15", label: "Event 4", type: "regular", completed: false, note: "" }
     , { date: "2026-10-22", label: "Event 5", type: "regular", completed: false, note: "" }
+    , { date: "2026-11-03", label: "Event 6", type: "regular", completed: false, note: "" }
 
     /* ---- ADD THE REST HERE AS THE DATES COME IN -------------------------
        Copy a line, change the date and number. Keep them in date order.
@@ -879,10 +880,17 @@ const BPL = {
         const pts = BPL.scoreOf(g, r);
         p._rawPoints += pts;
         p._eventPoints.push(pts);
-        p.winnings += r.winnings || 0;
+        /* Money a player actually took home = pool money + any bounty. The
+           two are stored apart so the pool column reconciles against the pot;
+           the season total is where they come back together. Old records
+           (before Oct 2026) folded the bounty into winnings -- those two rows
+           were corrected in the database rather than special-cased here. */
+        p.winnings += (r.winnings || 0) + (r.bounty || 0);
         p.rebuys += r.rebuys || 0;
         if (r.place === 1) p.wins += 1;
-        if (r.itm || (r.winnings || 0) > 0) p.cashes += 1;
+        /* A cash means you finished in a paying place. Taking the bounty on
+           your way out of the money is not a cash, however good it feels. */
+        if (r.itm) p.cashes += 1;
         p._places.push(r.place);
       });
     });

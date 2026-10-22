@@ -242,9 +242,15 @@ async function playGame(gameNo) {
     { game: gameNo, places: places.join(',') });
   check(new Set(names).size === names.length, 'duplicate player in finish', { game: gameNo });
 
+  /* The pool column reconciles against the pot EXACTLY. It used to allow
+     pot + bounty, which is not an invariant -- it was the bug restated, so a
+     correct record would have failed here. The bounty is checked separately. */
   const paid = rec.finish.reduce((s, f) => s + (f.winnings || 0), 0);
-  check(paid === rec.pot + (rec.bounty || 0), 'payouts do not sum to pot',
-    { game: gameNo, paid, pot: rec.pot, bounty: rec.bounty || 0 });
+  check(paid === rec.pot, 'pool money does not sum to pot',
+    { game: gameNo, paid, pot: rec.pot });
+  const bountyPaid = rec.finish.reduce((s, f) => s + (f.bounty || 0), 0);
+  check(bountyPaid === (rec.bounty || 0), 'bounty charged but not credited',
+    { game: gameNo, bountyPaid, charged: rec.bounty || 0 });
 
   rec.finish.forEach(f => {
     /* Base points plus 100 for cashing. Written out rather than calling
@@ -322,9 +328,12 @@ async function scenarios() {
     chk(rec.finish.filter(f => !f.itm).every(f => f.points === BPL.pointsFor(f.place, size, false)),
         `field ${size}: a dry finish got the cash bonus`);
     const paid = rec.finish.reduce((s, f) => s + (f.winnings || 0), 0);
-    chk(paid === rec.pot + (rec.bounty || 0), `field ${size}: payouts != pot`,
-        { paid, pot: rec.pot, bounty: rec.bounty || 0 });
-    chk(rec.finish.every(f => !f.winnings || f.winnings % 10 === 0 || f.bounty),
+    chk(paid === rec.pot, `field ${size}: pool money != pot`, { paid, pot: rec.pot });
+    /* No `|| f.bounty` escape hatch any more. That clause existed only because
+       a bounty folded into winnings could break the $10 rule; winnings is pool
+       money now, so every one of them is a clean multiple of ten. Keeping the
+       excuse would hide the bug coming back. */
+    chk(rec.finish.every(f => !f.winnings || f.winnings % 10 === 0),
         `field ${size}: a payout was not a multiple of $10`,
         rec.finish.filter(f => f.winnings && f.winnings % 10).map(f => f.name + ':' + f.winnings));
     chk(rec.type === "regular", `field ${size}: event type not preserved`, { type: rec.type });
